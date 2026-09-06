@@ -174,7 +174,7 @@ table.ltable tr.tag-drag-over td{background:rgba(184,152,42,0.1)!important;outli
 
 /* SUBCLASSES */
 .sub-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
-.sub-tab{font-size:0.77em;letter-spacing:1px;padding:5px 12px;border:1px solid var(--border);background:var(--panel);color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);}
+.sub-tab{font-size:0.77em;letter-spacing:1px;padding:5px 12px;border:1px solid rgba(200,200,230,0.22);background:rgba(255,255,255,0.06);color:var(--text);cursor:pointer;transition:all .15s;font-family:var(--font);}
 .sub-tab:hover{border-color:var(--sub);color:var(--sub);}
 .sub-tab.active{border-color:var(--sub);color:var(--sub);background:rgba(106,74,138,0.08);}
 .add-sub-btn{font-size:0.77em;letter-spacing:1px;padding:5px 10px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);}
@@ -355,8 +355,9 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   .sidebar.collapsed .sidebar-label,.sidebar.collapsed .sidebar-search,.sidebar.collapsed .sidebar-body{display:flex!important;opacity:1!important;}
   .sidebar-rh{display:none!important;}
   #sb-toggle{display:none!important;}
-  /* Основной контент на всю ширину */
-  .main{width:100%;overflow-x:hidden;}
+  /* Основной контент на всю ширину; clip вместо hidden — не блокирует скролл в дочерних контейнерах */
+  body{overflow-x:clip;}
+  .main{width:100%;overflow-x:clip;}
   /* Панели — вертикальный стек */
   .content-wrap{flex-direction:column;}
   .content-left{padding:12px 14px;}
@@ -389,8 +390,9 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   /* Атрибуты: на мобильном — после таблицы, правая колонка — скрыта */
   .mob-attr-block{display:block;}
   .content-right{display:none!important;}
-  /* Таблица */
-  .ltable-wrap{-webkit-overflow-scrolling:touch;}
+  /* Таблица: auto-layout чтобы колонки сами расширялись, wrap скроллится горизонтально */
+  .ltable-wrap{-webkit-overflow-scrolling:touch;overflow-x:auto;max-width:100%;}
+  table.ltable{table-layout:auto;width:max-content;min-width:100%;}
   /* Редактор умений */
   .ability-body-wrap{padding-left:10px;}
   .sub-editor-top{flex-wrap:wrap;gap:6px;}
@@ -1196,6 +1198,9 @@ function applyROMode() {
     '.sub-editor{display:none!important;}' +
     /* mobile: прячем action-bar — навигация через mob-topbar */
     '@media(max-width:768px){.action-bar{display:none!important;}}' +
+    /* скрываем секции добавления столбцов и шаблоны кастера */
+    '.add-col-section{display:none!important;}' +
+    '.tpl-section{display:none!important;}' +
     /* compendium */
     '.comp-toggle-drag-btn,.comp-drag-btn,.comp-edit-btn{display:none!important;}' +
     '.comp-add-btn,.comp-settings-btn,.comp-export-btn,.comp-add-cat-btn,.comp-cat-del-btn,.comp-cat-drag-h{display:none!important;}' +
