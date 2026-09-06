@@ -355,9 +355,15 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   .sidebar.collapsed .sidebar-label,.sidebar.collapsed .sidebar-search,.sidebar.collapsed .sidebar-body{display:flex!important;opacity:1!important;}
   .sidebar-rh{display:none!important;}
   #sb-toggle{display:none!important;}
-  /* Основной контент на всю ширину; clip вместо hidden — не блокирует скролл в дочерних контейнерах */
-  body{overflow-x:clip;}
-  .main{width:100%;overflow-x:clip;}
+  /* Основной контент на всю ширину */
+  body{overflow-x:hidden;}
+  .main{width:100%;overflow-x:hidden;}
+  /* Ограничиваем левую колонку — иначе flex-дети не знают своей ширины */
+  .content-wrap{width:100%;min-width:0;}
+  .content-left{width:100%;min-width:0;box-sizing:border-box;}
+  /* sub-bar и ltable-wrap явно ограничены шириной родителя */
+  .sub-bar{width:100%;}
+  .ltable-wrap{width:100%;}
   /* Панели — вертикальный стек */
   .content-wrap{flex-direction:column;}
   .content-left{padding:12px 14px;}
