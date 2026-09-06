@@ -15,6 +15,7 @@
 <meta name="description" content="Конструктор классов · Гильдия Путеискателей. Homebrew tool by Master Oogway.">
 <meta name="generator" content="Гильдия Путеискателей — оригинальный инструмент Master Oogway">
 <title>Конструктор классов · Гильдия Путеискателей</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
 <style>
 :root{--bg:#111428;--sidebar-bg:#171a30;--panel:#1c2038;--panel2:#222640;--border:#313660;--gold:#c9a832;--gold2:#e2ca55;--text:#f5f0e4;--muted:#d8d4c2;--accent:#5272a0;--sub:#7a5aaa;--font:'Calibri','Candara','Segoe UI',Arial,sans-serif;--ui-fs:13px;--table-fs:0.85em;}
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -340,7 +341,7 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   #mob-topbar{display:flex!important;align-items:center;gap:8px;position:fixed;top:0;left:0;right:0;height:44px;background:var(--sidebar-bg);border-bottom:1px solid var(--border);z-index:250;padding:0 12px;}
   #mob-menu-btn{background:transparent;border:none;color:var(--muted);font-size:1.3em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;}
   #mob-menu-btn:hover{color:var(--gold);}
-  #mob-topbar-title{font-size:0.72em;letter-spacing:3px;color:var(--muted);text-transform:uppercase;font-weight:700;flex:1;}
+  #mob-topbar-title{font-size:0.85em;letter-spacing:1px;color:var(--text);font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   /* Тёмная подложка под выдвинутый сайдбар */
   #mob-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:299;display:none;}
   #mob-overlay.vis{display:block;}
@@ -395,6 +396,11 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   .sub-editor-top{flex-wrap:wrap;gap:6px;}
   /* Сетка слотов */
   .add-col-section,.tpl-section{flex-wrap:wrap;}
+  /* Подклассы — горизонтальный скролл вместо переноса */
+  .sub-bar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px;scrollbar-width:none;}
+  .sub-bar::-webkit-scrollbar{display:none;}
+  /* Заголовок секции подклассов убираем лишний отступ */
+  .section{padding-top:10px;}
 }
 
 /* ============================================================
@@ -572,6 +578,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <div id="mob-topbar" style="display:none">
   <button id="mob-menu-btn" onclick="toggleMobileSidebar()">☰</button>
   <span id="mob-topbar-title">Классы</span>
+  <button id="mob-settings-btn" onclick="toggleSettingsPanel()" style="background:transparent;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;" title="Настройки">⚙</button>
 </div>
 <div id="mob-overlay" onclick="closeMobileSidebar()"></div>
 
@@ -943,12 +950,24 @@ function applyForeColorFromInput(inp){
 /* Settings panel */
 function toggleSettingsPanel(){
   const panel=document.getElementById('settings-panel');
+  if(!panel)return;
+  // На мобильном панель нужно вынести на уровень body, иначе скрытый action-bar прячет её
+  if(window.innerWidth<=768 && panel.parentElement!==document.body){
+    document.body.appendChild(panel);
+    panel.style.position='fixed';
+    panel.style.top='44px';
+    panel.style.right='0';
+    panel.style.left='0';
+    panel.style.zIndex='500';
+    panel.style.maxHeight='80dvh';
+    panel.style.overflowY='auto';
+  }
   const btn=document.getElementById('settings-btn');
   const vis=panel.classList.toggle('vis');
-  btn.classList.toggle('open',vis);
+  btn?.classList.toggle('open',vis);
 }
 document.addEventListener('mousedown',e=>{
-  if(!e.target.closest('#settings-btn')&&!e.target.closest('#settings-panel')){
+  if(!e.target.closest('#settings-btn')&&!e.target.closest('#mob-settings-btn')&&!e.target.closest('#settings-panel')){
     document.getElementById('settings-panel')?.classList.remove('vis');
     document.getElementById('settings-btn')?.classList.remove('open');
   }
@@ -1175,6 +1194,8 @@ function applyROMode() {
     '.sub-del-btn{display:none!important;}' +
     '.tiny-btn{display:none!important;}' +
     '.sub-editor{display:none!important;}' +
+    /* mobile: прячем action-bar — навигация через mob-topbar */
+    '@media(max-width:768px){.action-bar{display:none!important;}}' +
     /* compendium */
     '.comp-toggle-drag-btn,.comp-drag-btn,.comp-edit-btn{display:none!important;}' +
     '.comp-add-btn,.comp-settings-btn,.comp-export-btn,.comp-add-cat-btn,.comp-cat-del-btn,.comp-cat-drag-h{display:none!important;}' +
@@ -1791,6 +1812,9 @@ function _settingsHtml() {
 function renderMain(){
   const cls=getActive();
   const main=document.getElementById('main');
+  // Обновляем заголовок мобильного топбара
+  const _mobTitle=document.getElementById('mob-topbar-title');
+  if(_mobTitle) _mobTitle.textContent=cls?cls.name:'Классы';
   if(!cls){
     main.innerHTML=`
 <div class="action-bar">
