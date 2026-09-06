@@ -343,12 +343,17 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   #mob-menu-btn:hover{color:var(--gold);}
   #mob-topbar-title{font-size:0.85em;letter-spacing:1px;color:var(--text);font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   /* Тёмная подложка под выдвинутый сайдбар */
-  #mob-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:299;display:none;}
-  #mob-overlay.vis{display:block;}
+  #mob-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1999;display:none;pointer-events:none;}
+  #mob-overlay.vis{display:block;pointer-events:auto;}
+  /* iOS: выключаем pointer-events у закрытого drawer чтобы не перехватывал тачи */
+  .sidebar:not(.mob-open){pointer-events:none;}
+  .sidebar.mob-open{pointer-events:auto;}
   /* Сдвигаем body вниз под топ-бар */
   body{padding-top:44px;}
-  /* Сайдбар → выдвижной drawer */
-  .sidebar{position:fixed!important;left:0!important;top:44px!important;bottom:0!important;height:calc(100dvh - 44px)!important;width:260px!important;min-width:260px!important;transform:translateX(-100%);transition:transform .25s;z-index:300;background:linear-gradient(180deg,#2a2f5a 0%,#1e2244 100%)!important;box-shadow:4px 0 24px rgba(0,0,0,0.7);}
+  /* Основной контент изолируем в своём stacking context — чтобы не перекрывал drawer */
+  .main{isolation:isolate;}
+  /* Сайдбар → выдвижной drawer; z-index выше любых внутренних элементов */
+  .sidebar{position:fixed!important;left:0!important;top:44px!important;bottom:0!important;height:calc(100dvh - 44px)!important;width:260px!important;min-width:260px!important;transform:translateX(-100%);transition:transform .25s;z-index:2000!important;background:linear-gradient(180deg,#2a2f5a 0%,#1e2244 100%)!important;box-shadow:4px 0 24px rgba(0,0,0,0.7);}
   .sidebar.mob-open{transform:translateX(0)!important;}
   /* Сбрасываем desktop-collapsed состояние на мобильном */
   .sidebar.collapsed{width:260px!important;min-width:260px!important;}
@@ -1567,7 +1572,7 @@ function renderTable(cls){
     ${hasGroups?`<tr>
       <th colspan="${fixedCount}" data-col="__fixed"></th>
       ${groupRow.map(c=>c.type==='group'
-        ?`<th class="grp-hdr" colspan="${c.span}" data-col="__grp_${c.id}"><div class="col-hdr-inner">${esc(c.name)}<span class="grp-del-btn" onclick="delColGroup('${c.id}')">✕</span></div></th>`
+        ?`<th class="grp-hdr" colspan="${c.span}" data-col="__grp_${c.id}" title="${esc(c.name)}"><div class="col-hdr-inner">${esc(mobileAbbr(c.name))}<span class="grp-del-btn" onclick="delColGroup('${c.id}')">✕</span></div></th>`
         :`<th data-col="__solo"></th>`
       ).join('')}
     </tr>`:''}
@@ -1575,8 +1580,8 @@ function renderTable(cls){
       <th data-col="lv" ${colW(cls,'lv',30)}>Ур.${rh}</th>
       <th data-col="prof" ${colW(cls,'prof',36)}>БВ${rh}</th>
       <th data-col="features" style="width:${cw['features']||180}px">Классовые умения${rh}</th>
-      ${normalCols.map(c=>`<th data-col="${c.id}" ${colW(cls,c.id,70)} draggable="true"><div class="col-hdr-inner"><span class="col-drag-handle">⠿</span><span class="col-hdr-name" ondblclick="renameCol('${c.id}',this)">${esc(c.name)}</span><span class="del-col-btn" onclick="delCol('${c.id}')">✕</span></div>${rh}</th>`).join('')}
-      ${casterCols.map(c=>`<th data-col="${c.id}" ${c.isSlot?'data-slot':''} ${colW(cls,c.id,c.isSlot?0:60)}><div class="col-hdr-inner">${esc(c.name)}</div>${rh}</th>`).join('')}
+      ${normalCols.map(c=>`<th data-col="${c.id}" ${colW(cls,c.id,70)} draggable="true" title="${esc(c.name)}"><div class="col-hdr-inner"><span class="col-drag-handle">⠿</span><span class="col-hdr-name" ondblclick="renameCol('${c.id}',this)">${esc(mobileAbbr(c.name))}</span><span class="del-col-btn" onclick="delCol('${c.id}')">✕</span></div>${rh}</th>`).join('')}
+      ${casterCols.map(c=>`<th data-col="${c.id}" ${c.isSlot?'data-slot':''} ${colW(cls,c.id,c.isSlot?0:60)} title="${esc(c.name)}"><div class="col-hdr-inner">${esc(mobileAbbr(c.name))}</div>${rh}</th>`).join('')}
     </tr>
   </thead>`;
   const tbody=`<tbody>${cls.levels.map(lv=>renderLvRow(cls,lv,normalCols,casterCols)).join('')}</tbody>`;
@@ -2438,6 +2443,13 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
    MOBILE SUPPORT
    ============================================================ */
 function isMob(){ return window.innerWidth<=768; }
+/* Мобильные аббревиатуры заголовков таблицы: "Известно приёмов" → "И. П." */
+function mobileAbbr(text){
+  if(!isMob()) return text;
+  const words=text.trim().split(/\s+/);
+  if(words.length<2) return text;
+  return words.map(w=>(w[0]||'').toUpperCase()+'.').join(' ');
+}
 
 function toggleMobileSidebar(){
   const sb=document.getElementById('sidebar');
