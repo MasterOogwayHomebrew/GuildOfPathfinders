@@ -1616,10 +1616,10 @@ function renderLvRow(cls,lv,normalCols,casterCols){
       const s=sc?`background:${sc}1a;border-color:${sc}44;color:${sc};`:'';
       const linkedAb=sl?(cls.abilities||[]).find(a=>a.slvId===sl.id):null;
       const subDat=linkedAb?` data-ab-id="${linkedAb.id}"`:''
-      if(f) return `<span class="feature-tag sub-tag"${subDat} style="${s}"><span class="ft-label">${esc(f)}</span></span>`;
-      return `<span class="feature-tag sub-tag"${subDat} style="${s}"><span class="ft-label">Умение подкласса</span></span>`;
+      if(f) return `<span class="feature-tag sub-tag"${subDat} style="${s}">${esc(f)}</span>`;
+      return `<span class="feature-tag sub-tag"${subDat} style="${s}">Умение подкласса</span>`;
     } else {
-      return `<span class="feature-tag sub-tag"><span class="ft-label">Умение подкласса</span></span>`;
+      return `<span class="feature-tag sub-tag">Умение подкласса</span>`;
     }
   }).join('');
   return `<tr data-lv="${lv.lv}">
@@ -1753,7 +1753,8 @@ function editAbName(el,id){
 
 /* SUBCLASS EDITOR */
 function renderSubEditor(cls,sub){
-  const myLvs=(cls.subLevels||[]).filter(sl=>sl.subId===sub.id);
+  // Сортируем по уровню — новые умения автоматически встают на нужное место
+  const myLvs=(cls.subLevels||[]).filter(sl=>sl.subId===sub.id).sort((a,b)=>a.lv-b.lv);
   const sc=sub.color||null;
   return `<div class="sub-editor" data-sub-id="${sub.id}"${sc?` style="border-left:2px solid ${sc}44"`:''}>
     <div class="sub-editor-top">
