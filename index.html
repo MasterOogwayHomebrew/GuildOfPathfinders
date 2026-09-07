@@ -14,6 +14,22 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-07 (10) — Adam прислал скриншот мобильного топбара с вопросом "зачем в мобильной версии эти кнопки?" (обведены книга-компендиум и шестерёнка-настройки рядом с гамбургером) + явно: "кнопку компендиум на топбаре тоже вырежи не нужна у нас теперь не компендиум а библиотеки". Обе кнопки (#mob-comp-btn, #mob-settings-btn) убраны из #mob-topbar — они были чистой избыточностью: #mob-settings-btn дублировал #settings-btn в action-bar (тот же onclick=toggleSettingsPanel(), виден на мобильном и так, action-bar на мобилке не прячется целиком — прячется только .action-bar-title), а #mob-comp-btn был точечным быстрым переходом в "компендиум" без привязки к источнику/библиотеке — концептуально не имеет смысла теперь, когда компендиум это две раздельные именованные библиотеки (Черты/Приёмы), доступные как обычные пункты "☰ Меню", а не единая сущность с одной кнопкой-ярлыком. Мёртвое CSS-правило `body.comp-mode #mob-comp-btn,body.comp-mode #mob-settings-btn{display:none!important;}` тоже убрано. Мобильный топбар теперь: гамбургер + название класса, ничего больше — вся навигация (разделы, настройки, компендиум/библиотеки) идёт через "☰ Меню"/действия внутри страницы, как на десктопе.
+2026-09-07 (9) — ГАЛЕРЕЯ КЛАССОВ, РАЗДЕЛЕНИЕ БИБЛИОТЕК (Черты/Приёмы), ПРАВКИ ШАПКИ КЛАСС-БИЛДЕРА, ФИКСЫ РЕДАКТОРА. Большой заход по прямому запросу Adam (2 аннотированных скриншота шапки класс-билдера + серия отдельных сообщений с новыми скриншотами по ходу работы):
+  1) ГАЛЕРЕЯ КЛАССОВ (новая страница) — Adam: "кнопка классы тоже не нужна в библиотеке, когда я нажимаю на классы меня должно бросать на отдельную страницу с блоками которые и есть классы, который нажав только переходишь на класс" + позже подтвердил скриншотом, что старый список классов внутри "Меню" тоже не нужен ("вот тут эти моменты не нужны я уже говорил что мы будем делать"). Реализовано: клик "Классы" теперь ведёт на `src/<id>/classes` — новый экран #classes-gallery-view с карточками классов (имя+описание, ✕ удаления у owner, "+Добавить класс"), клик по карточке → `src/<id>/classes/<classId>` открывает класс-билдер как раньше (с "☰ Меню"). Поиск/сортировка (те же id sb-search/sb-sort, тот же код) переехали на саму страницу галереи. Блок #nav-menu-classes-block (поиск+сортировка+список+"+Добавить класс" внутри оверлея "Меню") ПОЛНОСТЬЮ УДАЛЁН — сначала думал оставить, но Adam явно указал, что это тоже лишнее теперь. renderSidebar()/renderClassItem() переписаны в renderClassCard()+openClassCard() — та же логика фильтрации по currentSourceId, но рендерят карточки в #classes-gallery-grid вместо списка в #class-list (которого больше нет — cat-folder/drag-между-категориями код (toggleCat/renameCatInline/initSidebarDrag) оставлен мёртвым, безопасно no-op'ится через null-проверки). Легаси-хэш `#classes` теперь редиректит на галерею первого источника вместо старого плоского списка с папками. addClassPrompt()/modalOk('class') и deleteClass() обновлены под новый флоу (после создания — сразу переход в билдер нового класса через hash).
+     БАГ, пойманный на QA (тот же класс проблем, что и "компендиум на пол-экрана" из захода (7)): у новых top-level вьюх, добавляемых в body{display:flex}, r-hidden сам по себе НИЧЕГО не делает — CSS-правила `#app-view.r-hidden{display:none}`/`#home-view.r-hidden{display:none}`/`#source-view.r-hidden{display:none}` заданы ПОИМЕННО по id, а не общим `.r-hidden{display:none}`. Забыл добавить `#classes-gallery-view.r-hidden{display:none}` — вьюха оставалась видимым flex-соседом и делила экран с класс-билдером пополам (визуально идентично старому багу). Исправлено, задокументировано как повторяющийся капкан на будущее: ЛЮБАЯ новая top-level вьюха в #app-view-подобной структуре ОБЯЗАНА получить собственное `#id.r-hidden{display:none}` правило.
+  2) РАЗДЕЛЕНИЕ КОМПЕНДИУМА НА 2 БИБЛИОТЕКИ — Adam: "приемы надо отдельную библиотеку как для заклинаний" + позже жёстче: "плюс кнопка приемы и стили ведет в один и тот же библиотеку а не должен". Раньше Приёмы и Боевые стили (Черты) были одним общим COMP{categories,entries} без разделения. Теперь у каждой категории COMP.categories[i] есть поле `section: 'traits'|'maneuvers'` (миграция старых данных в loadComp(): категория 'maneuver' → maneuvers, всё остальное → traits). Новый глобал `compSection` ('traits'/'maneuvers'/null) выставляется в routeFromHash() по тому, из какого раздела источника открыт компендиум (Приёмы→maneuvers, Черты(styles)→traits); мобильная кнопка-ярлык #mob-comp-btn открывает компендиум без фильтра (compSection=null, все библиотеки разом — она не привязана к разделу источника). Новый helper `compCatsInSection()` — им теперь фильтруются: compFilterEntries() (какие записи видны), renderCompByType() (какие категории-группы рисуются — раньше тут была реальная утечка: пустые заголовки чужой библиотеки всё равно рендерились), renderCompTopbar() (выпадашка категорий), renderCompSettingsPanel()+compAddCat() (управление категориями — новая категория получает section текущей библиотеки), compAddEntry()/renderCompDetail() (дефолтная и доступные категории для записи). В топбаре добавлена подпись текущей библиотеки (.comp-lib-title, "ЧЕРТЫ"/"ПРИЁМЫ"). БАГ, пойманный на QA: если панель категорий была открыта и переключиться между Приёмы↔Черты (compSection меняется, но comp-mode не выключается — оба раздела используют один и тот же #screen-compendium), панель оставалась с категориями СТАРОЙ библиотеки — openCompendium() теперь перерендеривает панель, если она была открыта. "Боевые стили" переименованы в "Черты" (только label в SOURCE_SECTIONS, id остался 'styles' — не трогал ради routing). ОГРАНИЧЕНИЕ осталось прежним: записи по-прежнему не фильтруются по источнику (нет sourceId в COMP.entries) — актуально для обеих библиотек одинаково.
+  3) ШАПКА КЛАСС-БИЛДЕРА (по аннотированным скриншотам Adam): ⚙-иконка настроек была похожа на солнце (круг+8 лучей) — перерисована в настоящую шестерёнку (Material "settings"-глиф, заливка вместо обводки-лучей), заменена везде, включая статичную копию в #mob-settings-btn (мобильный топбар — она не через ${ICO.gear}, т.к. это статичная HTML-разметка, см. памятку в записи (5) прошлых заходов). Убран color-picker `.cls-accent-dot` (ручной цвет тегов класса) и текстовое поле `.class-cat-input` ("📁 Категория...", то самое ручное назначение в папки — Adam давно просил вырезать, но поле физически оставалось) — теперь class-header содержит только название+описание+ссылки. Плашки умений в таблице (.feature-tag) для КЛАССОВЫХ умений (abId>0) больше не красятся в cls.accentColor — используют единый var(--accent) как остальной UI; плашки ПОДКЛАССОВЫХ умений (abId<0, красятся в sub.color) НЕ ТРОНУТЫ — Adam явно попросил оставить это исключение. .action-bar-title ("Гильдия Путеискателей") увеличен (0.69em→1.25em) и шрифт сменён с Cinzel (var(--font-head)) на обычный var(--font) — Cinzel с letter-spacing:3px на мелком кегле читался плохо, Adam явно указал "сам шрифт не подходит не красиво". .cls-link-pill/.add-link-btn перекрашены с хардкод-фиолетового (#9a78c8/#8a6aaa) на палитровый gold2 (тот же паттерн, что .home-link-btn), фон сделан приглушённее (alpha 0.13→0.07) по отдельному запросу "фон этих кнопок... приглушить".
+  4) УБРАНЫ ЛИШНИЕ КНОПКИ НАВИГАЦИИ: `.comp-back-btn` "◄ Классы" в топбаре компендиума (десктоп) убран — "Меню" уже даёт полную навигацию, кнопка дублировала функциональность. Заодно (proactive cleanup, лицензия Adam "посмотри сам") унифицирован тот же паттерн на мобильном: `#mob-back-btn` ("◄ Классы", показывался вместо гамбургера в comp-mode) убран вместе с CSS-правилом, которое его показывало/прятало гамбургер — теперь гамбургер-Меню виден всегда, в том числе внутри компендиума, на обеих платформах одинаково.
+  5) АВТО-НАЗНАЧЕНИЕ УМЕНИЯ ПОДКЛАССУ ВМЕСТО РУЧНОГО DROPDOWN — Adam указал на dropdown "— класс —" (.ab-sub-sel, переопределяющий cls.abilities[].subId) в шапке карточки умения как на лишнюю кнопку. Убран из разметки; вместо этого addAbility() теперь сам проставляет `subId:activeSubId` — новое умение автоматически привязывается к той подклассовой вкладке, которая была открыта в момент создания (как уже работало для умений уровней подклассов). ИЗВЕСTНОЕ ОГРАНИЧЕНИЕ: переназначить умение другому подклассу после создания теперь нельзя через UI (только пересоздать на нужной вкладке) — если понадобится, добавить отдельную функцию позже.
+  6) РЕДАКТОР ТЕКСТА — ЧАСТИЧНЫЙ ФИКС БАГОВ (не полный редизайн по мотивам Obsidian, как просил Adam буквально — это отдельный большой проект, см. открытые задачи): подтверждённый конкретный баг — кнопка "Код" в контекстном меню (wrapSelectionTag) не имела toggle-функции, повторный клик оборачивал текст в code ещё раз вместо снятия. Исправлено: wrapSelectionTag(tag) теперь проверяет, не находится ли выделение уже внутри такого тега, и если да — снимает обёртку. Заодно добавлен toggleHeading() (клик "Заголовок" переключает h3↔обычный параграф, раньше только ставил h3 без обратного пути) и removeAllFormat() (клик "Убрать форматирование" теперь дополнительно снимает <code>/<h1-h6>, которые нативный document.execCommand('removeFormat') не трогает вообще — это тоже баг из тех, что Adam описал как "почти со всеми кнопками какие-то баги"). Остальные кнопки (bold/italic/underline/strikeThrough/списки) используют нативный execCommand, который уже toggle'ится браузером — отдельных багов там не найдено при ручном тестировании через Playwright.
+  7) МЕЛОЧЬ: `.class-list`/`.col-hdr-name` для сгруппированных колонок таблицы (кастер-колонки вроде "Кость приёма"/"Кол-во костей" внутри группы вроде "Ячейки заклинаний") не поддерживали переименование двойным кликом (был баг — Adam: "в таблице не могу название этих столбцов редачить") — обычные колонки (normalCols) уже умели, а сгруппированные (casterCols) и сама группа (colGroups) — нет. Добавлен ondblclick=renameCol(...) для casterCols-заголовков и новая функция renameColGroup() для заголовка группы.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, несколько QA-скриптов): галерея классов (карточки/клик/добавление/легаси-редирект/удаление), разделение библиотек (записи и категории не текут между Черты/Приёмы, включая живой баг с открытой панелью настроек), toggle кода и заголовка в редакторе, переименование сгруппированных колонок, отсутствие cls-accent-dot/class-cat-input/ab-sub-sel в разметке, десктоп+мобилка (390×844) для всех новых экранов. Ошибок в консоли не найдено ни на одном сценарии.
+2026-09-07 (8) — КОМПЕНДИУМ: НАСТОЯЩИЕ 5 КОЛОНОК (JS вместо CSS columns) + УБРАНЫ 3 КНОПКИ. Adam прислал скриншот вида "Тип" с категорией "Боевой стиль" в ОДНУ колонку (аннотировано красными линиями "тут должно быть 5"), плюс отметил три ненужные кнопки в топбаре:
+  1) Корневая причина одноколоночного бага: `.comp-group-entries{column-count:5;column-fill:auto}` (CSS multi-column) технически ничего не гарантирует, когда высота контейнера auto — column-fill:auto в этом случае не имеет опорной высоты для "заливки" колонки перед переходом к следующей, и Chromium на практике рендерит всё в одну колонку вместо пяти. Раньше (заход 1) это уже давало "перемешанный" вид с балансировкой (column-fill:balance по умолчанию) — column-fill:auto замаскировал симптом, но не убрал первопричину (нет явной высоты).
+  2) Исправлено полностью — CSS-колонки заменены на честные JS-колонки: новая функция `compSplitColumns(htmlItems, cols=5)` режет уже отсортированный список HTML-кусков на 5 строго последовательных частей (col1 = первые N/5 элементов и т.д., без балансировки) и оборачивает каждую в `<div class="comp-col">`. Применена во ВСЕХ трёх видах компендиума: renderCompByType (колонки внутри каждой категории), renderCompByLevel (колонки внутри каждого уровня), renderCompByName (весь алфавитный список, включая буквенные заголовки А/Б/В — они просто идут в общей последовательности блоков, не дублируются на каждую колонку). `.comp-group-entries`/`.comp-flat-list` теперь `display:flex` (ряд из 5 `.comp-col`, каждый `flex:1;display:flex;flex-direction:column`), а не CSS multi-column. На мобильном (`@media max-width:768px`) обе переключены на `flex-direction:column` — 5 колонок на узком экране нечитаемы, там всё стоит одним потоком (с небольшими зазорами между исходными колонками — сортировка не ломается, просто видно 5 "пачек" вместо ровного списка; сознательно не стал городить отдельную мобильную ветку рендера ради чистого визуала).
+  3) Убраны 3 кнопки из топбара компендиума по прямому указанию Adam (аннотированный скриншот): "🔒 Переместить" (compDragMode/compToggleDrag — переключатель режима перетаскивания записей между категориями) и обе кнопки экспорта/импорта JSON компендиума "⬇ Компендиум"/"⬆ Импорт" (exportCompendium/importCompendium). Сами функции (compToggleDrag/exportCompendium/importCompendium/initCompEntryDrag) оставлены в коде неиспользуемыми — тот же паттерн, что и с JSON-кнопками класс-билдера в заходе 4.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, 24 тестовые записи в одной категории — повторяет сценарий со скриншота Adam'а): вид "Тип" — ровно 5 колонок, алфавитный порядок сохранён (сверху вниз, затем слева направо); вид "Название" — тоже 5 колонок с буквенными заголовками на своих местах; мобильная раскладка (390×844) — читаемо, без реальной поломки сортировки.
 2026-09-07 (7) — СЕЙДБАР ВЫРЕЗАН В МЕНЮ, ФИКС БАГА "КОМПЕНДИУМ НА ПОЛ-ЭКРАНА", ПОПАП-ПРИВЕТСТВИЕ УБРАН, ССЫЛКИ НА ГЛАВНОЙ, ЗАКРУГЛЕНИЕ КНОПОК. По прямому запросу Adam (аннотированные скриншоты с зачёркнутым сайдбаром + серия отдельных сообщений):
   1) Постоянный левый сайдбар (.sidebar#sidebar: заголовок "Классы", кнопка "Компендиум", поиск/сортировка, список классов, "+Добавить класс") ПОЛНОСТЬЮ УДАЛЁН из разметки #app-view. .main теперь занимает всю ширину. Вся функциональность переехала внутрь #nav-menu-panel (то самое "отдельное окно" из предыдущего захода): renderNavMenu() теперь пишет ссылки Главная/разделы в подконтейнер #nav-menu-links (а не в весь panel.innerHTML, как раньше) и отдельно переключает видимость #nav-menu-classes-block (поиск+сортировка+список классов+"+Добавить класс", те же id/классы sb-search/sb-sort/class-list/add-class-btn — код renderSidebar()/initSidebarDrag() не тронут, работает по тем же селекторам) — блок показывается только когда активен раздел "Классы". Клик по классу в меню теперь закрывает оверлей (closeNavMenu() вместо старого closeMobileSidebar()).
   2) Мобильный хостбургер (#mob-menu-btn) больше не открывает отдельный drawer-сайдбар — теперь тоже вызывает toggleNavMenu(), то есть mobile и desktop используют ОДНО и то же меню-окно. Убраны как мёртвый код: toggleMobileSidebar()/closeMobileSidebar(), #mob-overlay (тёмная подложка старого drawer'а), toggleSidebar()/sidebarOff (десктопный collapse), resize-хендл .sidebar-rh (десктопный resize), .comp-nav-btn (дублирующая кнопка "Компендиум" в сайдбаре — теперь то же самое доступно через пункты "Приёмы"/"Боевые стили" в меню). Вся мобильная CSS-секция для drawer'а (.sidebar{position:fixed...}, .mob-open и т.д.) вычищена.
@@ -63,15 +79,19 @@ CHANGELOG (новое сверху):
 2026-09-07 (1) — .comp-group-entries: добавлен column-fill:auto — чинили "перемешанный" вид компендиума (браузерный дефолт column-fill:balance распределяет по высоте непредсказуемо, auto — строго сверху-вниз по колонке).
 
 ОТКРЫТЫЕ ЗАДАЧИ (см. память для полного списка):
+- Классы — отдельная страница-галерея (карточки) вместо списка в меню — СДЕЛАНО 2026-09-07(9): src/<id>/classes (галерея) → src/<id>/classes/<classId> (билдер). Список в "Меню" (#nav-menu-classes-block) удалён.
+- Компендиум разделён на 2 независимые библиотеки (Черты/Приёмы) по полю section у категорий — СДЕЛАНО 2026-09-07(9). "Боевые стили" переименованы в "Черты". ОГРАНИЧЕНИЕ ОСТАЁТСЯ: записи всё ещё не фильтруются по источнику (нет sourceId в COMP.entries) — при появлении 2-го реального источника нужно добавить фильтр в обеих библиотеках.
+- Компендиум: 5 колонок — СДЕЛАНО 2026-09-07(8) через честные JS-колонки (compSplitColumns), CSS column-count оказался ненадёжен (схлопывался в одну колонку без явной высоты).
+- Редактор текста: toggle для "Код"/"Заголовок", removeFormat снимает code/heading — СДЕЛАНО 2026-09-07(9) (частично, точечные фиксы). ПОЛНЫЙ РЕДИЗАЙН по мотивам Obsidian (Adam просил "поработай прям основательно... перепиши с нуля") — ЕЩЁ НЕ СДЕЛАНО, отдельный большой проект: нужно сначала обсудить с Adam объём (что именно из возможностей Obsidian переносим — slash-команды, live preview, markdown-source режим и т.д.), сейчас редактор остаётся на contenteditable+execCommand.
+- Переназначение умения другому подклассу после создания — dropdown убран 2026-09-07(9) (Adam счёл лишним), теперь subId выставляется автоматически по активной вкладке подкласса в момент создания; ручного способа переназначить позже нет — если понадобится, добавить отдельно.
 - Мобильные сокращения через синтаксис "Термин (СОКР)" — десктоп/мобайл разный текст
-- Дерево Источник→Раздел — СДЕЛАНО 2026-09-07(6): Главная→источник(#source-view)→раздел(Классы/Приёмы/Боевые стили/Справочник), меню-оверлей слева. ОГРАНИЧЕНИЕ: Приёмы/Боевые стили ведут в общий (нефильтрованный по источнику) компендиум — при появлении 2-го реального источника нужно добавить sourceId в COMP.entries и фильтровать. Справочник — просто "Скоро", раздел не спроектирован.
-- Постоянный сайдбар класс-билдера — ВЫРЕЗАН 2026-09-07(7), список классов переехал в #nav-menu-panel (единое меню для десктопа и мобилки).
-- Кастомные SVG-иконки вместо эмодзи — СДЕЛАНО (компас 2026-09-07(4), остальные функциональные иконки 2026-09-07(5)). Не тронуты: 📁 в placeholder категории, ⬇⬆✕◀▶⧉✎⠿ (typographic-символы, не цветные эмодзи, уже наследуют var(--muted)/var(--gold) через color), цвета подклассов/категорий компендиума (пользовательские данные).
-- Домашняя страница: карточки источников — СДЕЛАНО 2026-09-07(6), рендерятся из sources[], owner добавляет через "+Добавить источник" (форма, как "+Добавить класс"). Доп. кнопки-ссылки (Discord и т.п.) — СДЕЛАНО 2026-09-07(7), homeLinks[]/"+ Кнопка".
-- Единая автоматическая палитра классов/подклассов/категорий вместо ручных цветовых пикеров — ЕЩЁ НЕ СДЕЛАНО (запрошено, не начато).
-- Редизайн .feature-tag (плашки умений в таблице) и .ability-card (карточки умений) — ЕЩЁ НЕ СДЕЛАНО (запрошено, не начато).
-- Домашние "плашки" источников с автоматическим счётчиком записей (сейчас — фиксированные подписи SOURCE_SECTIONS без чисел) — требует уточнения у Adam, что именно считать.
-- Редактор body: toggle для кнопок форматирования, заголовки H1-H3, кастомный разделитель, экспорт — ЕЩЁ НЕ СДЕЛАНО
+- Дерево Источник→Раздел — СДЕЛАНО 2026-09-07(6): Главная→источник(#source-view)→раздел(Классы/Приёмы/Черты/Справочник), меню-оверлей слева. Справочник — просто "Скоро", раздел не спроектирован.
+- Постоянный сайдбар класс-билдера — ВЫРЕЗАН 2026-09-07(7), список классов переехал в галерею классов (2026-09-07(9), было временно в #nav-menu-panel в заходе (7), затем убрано оттуда).
+- Кастомные SVG-иконки вместо эмодзи — СДЕЛАНО (компас 2026-09-07(4), остальные функциональные иконки 2026-09-07(5), шестерёнка перерисована из "солнца" в настоящий cog 2026-09-07(9)). Не тронуты: 📁 в placeholder категории, ⬇⬆✕◀▶⧉✎⠿ (typographic-символы, не цветные эмодзи, уже наследуют var(--muted)/var(--gold) через color), цвета подклассов/категорий компендиума (пользовательские данные).
+- Домашняя страница: карточки источников — СДЕЛАНО 2026-09-07(6). Доп. кнопки-ссылки (Discord и т.п.) — СДЕЛАНО 2026-09-07(7), homeLinks[]/"+ Кнопка".
+- Единая автоматическая палитра классов/подклассов/категорий вместо ручных цветовых пикеров — ЧАСТИЧНО: ручной цвет класса (cls.accentColor/.cls-accent-dot) убран 2026-09-07(9), плашки классовых умений теперь всегда var(--accent). Цвета подклассов (sub.color) и категорий компендиума остаются ручными по прямому запросу Adam (это разные библиотеки/сущности, не тот же кейс).
+- Редизайн .feature-tag (плашки умений в таблице) — СДЕЛАНО 2026-09-07(9) (единый цвет, кроме подклассовых). .ability-card (карточки умений) — ЕЩЁ НЕ СДЕЛАНО.
+- Домашние "плашки" источников с автоматическим счётчиком записей (сейчас — фиксированные подписи SOURCE_SECTIONS без чисел) — требует уточнения у Adam, что именно считать; возможно неактуально теперь, когда Приёмы/Черты — разные библиотеки (считать записи в каждой?).
 ═══════════════════════════════════════════════════════════════════════════════ -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -130,7 +150,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 
 /* ACTION BAR */
 .action-bar{display:flex;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);background:var(--sidebar-bg);align-items:center;flex-wrap:wrap;}
-.action-bar-title{font-family:var(--font-head);font-size:0.69em;letter-spacing:3px;color:var(--gold2);text-transform:uppercase;flex:1;font-weight:700;opacity:0.85;}
+.action-bar-title{font-family:var(--font);font-size:1.25em;letter-spacing:1.5px;color:var(--gold2);text-transform:uppercase;flex:1;font-weight:700;opacity:0.9;}
 .act-btn{font-size:0.85em;padding:4px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .act-btn:hover{border-color:var(--gold);color:var(--gold);}
 .act-btn.export{border-color:rgba(78,122,92,0.4);color:var(--accent);}
@@ -407,6 +427,8 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   /* Основной контент на всю ширину */
   body{overflow-x:hidden;}
   .main{width:100%;overflow-x:hidden;}
+  /* Компендиум: 5 колонок на десктопе слишком узкие для мобильного экрана — на мобиле складываем в одну колонку */
+  .comp-group-entries,.comp-flat-list{flex-direction:column;}
   /* align-items:flex-start глобально — на мобильном переключаем на stretch чтобы дети растягивались */
   .content-wrap{width:100%;min-width:0;align-items:stretch;}
   .content-left{width:100%;min-width:0;box-sizing:border-box;}
@@ -464,9 +486,7 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
    COMPENDIUM
    ============================================================ */
 #screen-compendium{display:none;flex-direction:column;width:100%;height:100vh;overflow:hidden;background:var(--bg);}
-/* mob-topbar в comp-mode: скрываем стандартные кнопки, показываем кнопку назад */
-body.comp-mode #mob-menu-btn,body.comp-mode #mob-comp-btn,body.comp-mode #mob-settings-btn{display:none!important;}
-body.comp-mode #mob-back-btn{display:flex!important;}
+/* mob-topbar в comp-mode: гамбургер-меню остаётся видимым — навигация теперь всегда только через Меню (кнопки-ярлыки компендиума/настроек в топбаре убраны, см. запись 10 — были избыточны, дублировали #settings-btn/пункты меню) */
 /* comp-screen на мобильном учитывает topbar */
 @media(max-width:768px){#screen-compendium{padding-top:44px;}}
 /* Прямой вызов openCompendium() из #mob-comp-btn не меняет hash — .main прячем отдельно (app-view уже скрыт роутером во всех остальных случаях) */
@@ -477,6 +497,7 @@ body.comp-mode #screen-compendium{display:flex!important;}
 .comp-topbar{display:flex;align-items:center;gap:5px;padding:7px 10px;background:var(--sidebar-bg);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
 .comp-back-btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:5px 10px;cursor:pointer;font-size:0.82em;font-family:var(--font);transition:all .15s;white-space:nowrap;flex-shrink:0;border-radius:var(--radius-sm);}
 .comp-back-btn:hover{border-color:var(--gold);color:var(--gold);}
+.comp-lib-title{font-family:var(--font);font-size:0.85em;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gold2);opacity:0.85;white-space:nowrap;flex-shrink:0;padding:0 4px;}
 .comp-search-wrap{position:relative;flex:1;min-width:130px;}
 .comp-search-inp{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 8px 5px 26px;font-size:0.85em;outline:none;font-family:var(--font);border-radius:var(--radius-sm);}
 .comp-search-inp:focus{border-color:var(--gold);}
@@ -509,13 +530,15 @@ body.comp-mode #screen-compendium{display:flex!important;}
 .comp-group{margin-bottom:18px;}
 .comp-group-label{display:flex;align-items:center;gap:7px;font-family:var(--font-head);font-size:0.7em;letter-spacing:2.5px;text-transform:uppercase;font-weight:700;padding:0 0 6px;border-bottom:2px solid;margin-bottom:6px;white-space:nowrap;}
 .comp-group-label .cgl-icon{font-size:1.2em;line-height:1;}
-.comp-group-entries{column-count:5;column-gap:0;column-fill:auto;}
+/* 5 колонок — теперь настоящие div'ы (.comp-col), а не CSS column-count (см. compSplitColumns() в JS) */
+.comp-group-entries{display:flex;gap:18px;align-items:flex-start;}
+.comp-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:0;}
 .comp-empty-zone{padding:4px 6px;color:var(--muted);font-size:0.8em;font-style:italic;}
 .comp-drop-zone{padding:6px 10px;color:var(--muted);font-size:0.78em;text-align:center;border:1px dashed var(--border);border-radius:3px;margin:2px;transition:all .15s;}
 .comp-drop-zone.drag-over{background:rgba(158,124,50,0.1);border-color:var(--gold);color:var(--gold);}
 
 /* Entries */
-.comp-entry{display:flex;align-items:center;gap:6px;padding:4px 6px;background:transparent;cursor:pointer;transition:background .1s;user-select:none;min-width:0;border-radius:3px;break-inside:avoid;}
+.comp-entry{display:flex;align-items:center;gap:6px;padding:4px 6px;background:transparent;cursor:pointer;transition:background .1s;user-select:none;min-width:0;border-radius:3px;}
 .comp-entry:hover{background:var(--panel2);}
 .comp-entry.drag-over{background:rgba(158,124,50,0.1);outline:1px dashed rgba(158,124,50,0.45);}
 .comp-entry.dragging{opacity:0.35;}
@@ -523,8 +546,8 @@ body.comp-mode #screen-compendium{display:flex!important;}
 .comp-entry-name{font-size:0.88em;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .comp-entry-lvl{font-size:0.72em;color:var(--muted);flex-shrink:0;}
 
-/* Flat list (Name/Level view) */
-.comp-flat-list{display:flex;flex-direction:column;gap:0;}
+/* Flat list (Name view) — тоже 5 колонок через .comp-col, буквенные заголовки идут внутри общей последовательности */
+.comp-flat-list{display:flex;gap:18px;align-items:flex-start;}
 .comp-alpha-hdr,.comp-level-hdr{padding:4px 6px;font-size:0.63em;letter-spacing:2px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);margin-top:10px;margin-bottom:2px;}
 .comp-flat-list .comp-entry{border-bottom:1px solid rgba(44,61,48,0.25);border-radius:0;}
 
@@ -587,14 +610,14 @@ body.comp-mode #screen-compendium{display:flex!important;}
 /* LINKS */
 .cls-links-wrap{margin-top:6px;display:flex;flex-direction:column;gap:3px;}
 .cls-link-row{display:flex;align-items:center;gap:5px;}
-.cls-link-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;background:rgba(138,106,58,0.13);border:1px solid rgba(138,106,58,0.32);color:#9a78c8;font-size:0.78em;cursor:pointer;text-decoration:none;transition:background .15s;}
-.cls-link-pill:hover{background:rgba(138,106,58,0.26);}
+.cls-link-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;background:rgba(158,124,50,0.07);border:1px solid rgba(158,124,50,0.32);color:var(--gold2);font-size:0.78em;cursor:pointer;text-decoration:none;transition:background .15s;}
+.cls-link-pill:hover{background:rgba(158,124,50,0.16);border-color:var(--gold2);}
 .cls-link-label-inp{width:90px;font-size:0.79em;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 6px;outline:none;font-family:var(--font);}
 .cls-link-url-inp{flex:1;font-size:0.79em;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 6px;outline:none;font-family:var(--font);}
 .cls-link-del{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:0.8em;padding:0 3px;line-height:1;transition:color .12s;}
 .cls-link-del:hover{color:#c04444;}
-.add-link-btn{font-size:0.74em;padding:2px 9px;background:transparent;border:1px dashed rgba(138,106,58,0.35);color:#8a6aaa;border-radius:12px;cursor:pointer;font-family:var(--font);transition:all .15s;}
-.add-link-btn:hover{background:rgba(138,106,58,0.12);border-style:solid;}
+.add-link-btn{font-size:0.74em;padding:2px 9px;background:transparent;border:1px dashed rgba(158,124,50,0.35);color:var(--gold2);border-radius:12px;cursor:pointer;font-family:var(--font);transition:all .15s;}
+.add-link-btn:hover{background:rgba(158,124,50,0.1);border-style:solid;}
 
 /* DESIGN POLISH */
 .action-bar{box-shadow:0 1px 0 rgba(158,124,50,0.18);}
@@ -613,6 +636,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 #app-view{display:flex;width:100%;}
 #app-view.r-hidden{display:none;}
 #home-view.r-hidden{display:none;}
+#classes-gallery-view.r-hidden{display:none;}
 #home-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
 .home-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:64px 24px 44px;position:relative;overflow:hidden;}
 .home-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 0%,rgba(78,122,92,0.12),transparent 70%);pointer-events:none;}
@@ -654,10 +678,13 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-source-card.add-source-card .home-source-name{color:var(--muted);}
 .home-source-card.add-source-card:hover{border-color:var(--gold);}
 .home-source-card.add-source-card:hover .home-source-name{color:var(--gold2);}
+.class-gallery-del{position:absolute;top:8px;right:10px;font-size:0.78em;color:var(--muted);opacity:0.5;cursor:pointer;line-height:1;transition:all .15s;z-index:2;}
+.class-gallery-del:hover{opacity:1;color:#c06060;}
 
 /* ═══ СТРАНИЦА ИСТОЧНИКА (Источник→Раздел) ═══ */
 #source-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
 #source-view.r-hidden{display:none;}
+#classes-gallery-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
 .source-hero{max-width:900px;margin:0 auto;padding:50px 24px 10px;text-align:center;}
 .source-home-link{background:transparent;border:none;color:var(--muted);font-family:var(--font);font-size:0.85em;cursor:pointer;margin-bottom:22px;padding:4px 8px;display:inline-flex;align-items:center;gap:6px;transition:color .15s;}
 .source-home-link:hover{color:var(--gold);}
@@ -665,6 +692,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .source-desc{font-family:var(--font-body);color:var(--muted);font-size:1.08em;margin-bottom:8px;}
 .source-sections-grid{max-width:900px;margin:26px auto 0;padding:0 24px 60px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
 .source-section-btn{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:22px 14px;text-align:center;cursor:pointer;font-family:var(--font-head);font-size:0.95em;letter-spacing:0.04em;color:var(--text);transition:all .15s;}
+.classes-gallery-grid{max-width:900px;margin:10px auto 0;padding:0 24px 60px;}
 .source-section-btn:hover{border-color:var(--gold);color:var(--gold2);background:var(--panel2);}
 .source-stub{max-width:600px;margin:20px auto 60px;text-align:center;color:var(--muted);font-family:var(--font);padding:0 24px;grid-column:1/-1;}
 
@@ -740,21 +768,24 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
   <div class="home-footer">© Master Oogway · Гильдия Путеискателей</div>
 </div>
 
+<div id="classes-gallery-view" class="r-hidden">
+  <div class="source-hero">
+    <button class="source-home-link" id="gallery-back-btn">← Назад</button>
+    <h1 class="source-title" id="gallery-title">Классы</h1>
+    <div class="sidebar-search" style="position:relative;max-width:280px;margin:0 auto 10px;">
+      <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;display:flex;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg></span>
+      <input class="sb-search-inp" id="sb-search" style="padding-left:26px;" placeholder="Поиск..." oninput="renderSidebar()">
+    </div>
+    <button class="sb-sort-btn" id="sb-sort" onclick="toggleSort()" style="max-width:150px;margin:0 auto;">A–Z Сортировка</button>
+  </div>
+  <div class="home-sources-grid classes-gallery-grid" id="classes-gallery-grid"></div>
+  <div class="home-footer">© Master Oogway · Гильдия Путеискателей</div>
+</div>
+
 <!-- ═══ ОВЕРЛЕЙ НАВИГАЦИОННОГО МЕНЮ — единая точка навигации (Главная/разделы/список классов), не влияет на разметку страницы под собой ═══ -->
 <div class="nav-menu-overlay" id="nav-menu-overlay" onclick="if(event.target===this)closeNavMenu()">
   <div class="nav-menu-panel" id="nav-menu-panel">
     <div id="nav-menu-links"></div>
-    <div class="nav-menu-classes" id="nav-menu-classes-block">
-      <div class="nav-menu-sep"></div>
-      <div class="nav-menu-title">Классы</div>
-      <div class="sidebar-search" style="position:relative;">
-        <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;display:flex;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg></span>
-        <input class="sb-search-inp" id="sb-search" style="padding-left:26px;" placeholder="Поиск..." oninput="renderSidebar()">
-        <button class="sb-sort-btn" id="sb-sort" onclick="toggleSort()">A–Z Сортировка</button>
-      </div>
-      <div class="class-list" id="class-list"></div>
-      <button class="add-class-btn" onclick="addClassPrompt()">+ Добавить класс</button>
-    </div>
   </div>
 </div>
 
@@ -763,10 +794,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <!-- Мобильный: фиксированный топ-бар (скрыт на десктопе) -->
 <div id="mob-topbar" style="display:none">
   <button id="mob-menu-btn" onclick="toggleNavMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-  <button id="mob-back-btn" onclick="closeCompendium()" style="display:none;background:transparent;border:none;color:var(--gold);font-size:0.95em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;font-family:var(--font);">◀ Классы</button>
   <span id="mob-topbar-title">Классы</span>
-  <button id="mob-comp-btn" onclick="openCompendium()" style="background:transparent;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;" title="Компендиум"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 5c2-1.3 5-1.3 8 0v14c-3-1.3-6-1.3-8 0V5Z"/><path d="M20 5c-2-1.3-5-1.3-8 0v14c3-1.3 6-1.3 8 0V5Z"/></svg></button>
-  <button id="mob-settings-btn" onclick="toggleSettingsPanel()" style="background:transparent;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;" title="Настройки"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="vertical-align:-2px"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg></button>
 </div>
 
 <div class="main" id="main">
@@ -859,7 +887,7 @@ const OWNER_EMAIL = 'aldam.dubaev@gmail.com';
 const ICO = {
   menu:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
   book:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 5c2-1.3 5-1.3 8 0v14c-3-1.3-6-1.3-8 0V5Z"/><path d="M20 5c-2-1.3-5-1.3-8 0v14c3-1.3 6-1.3 8 0V5Z"/></svg>',
-  gear:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="vertical-align:-2px"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg>',
+  gear:'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px"><path d="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94z M12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z"/></svg>',
   chat:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 5h16v11H9l-4 4V5Z"/></svg>',
   exit:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M14 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8"/><path d="M11 12h9m0 0-3-3m3 3-3 3"/></svg>',
   search:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="vertical-align:-2px"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg>',
@@ -905,7 +933,7 @@ let sources=[], currentSourceId=null, editingSourceId=null;
 const SOURCE_SECTIONS=[
   {id:'classes', label:'Классы'},
   {id:'maneuvers', label:'Приёмы'},
-  {id:'styles', label:'Боевые стили'},
+  {id:'styles', label:'Черты'},
   {id:'reference', label:'Справочник'}
 ];
 const DEFAULT_SOURCES=[
@@ -1432,48 +1460,30 @@ function syncFeatures(cls){
   });
 }
 
-/* SIDEBAR RENDER */
-function renderClassItem(c,cat){
-  return `<div class="class-item${c.id===activeId?' active':''}" data-cls-id="${c.id}" data-cat="${esc(cat)}" draggable="true" onclick="selectClass(${c.id})">
-    <span class="cls-file-icon">📄</span>
-    <span class="class-item-name">${esc(c.name)}</span>
-    <span class="class-item-del" onclick="event.stopPropagation();deleteClass(${c.id})">✕</span>
+/* CLASSES GALLERY RENDER (заменяет собой бывший постоянный сайдбар и список в меню — см. renderClassesGallery ниже) */
+function renderClassCard(c){
+  return `<div class="home-source-card class-gallery-card" data-cls-id="${c.id}" onclick="openClassCard(${c.id})">
+    ${isOwner?`<span class="class-gallery-del" onclick="event.stopPropagation();deleteClass(${c.id})" title="Удалить класс">✕</span>`:''}
+    <div class="home-source-name">${esc(c.name)}</div>
+    ${c.desc?`<div class="home-source-desc">${esc(c.desc)}</div>`:''}
   </div>`;
+}
+
+function openClassCard(id){
+  if(currentSourceId) location.hash='src/'+encodeURIComponent(currentSourceId)+'/classes/'+id;
+  else selectClass(id);
 }
 
 function renderSidebar(){
   const query=(document.getElementById('sb-search')?.value||'').toLowerCase();
   let list=[...classes];
   if(currentSourceId) list=list.filter(c=>(c.category||'')===currentSourceId);
-  if(query) list=list.filter(c=>c.name.toLowerCase().includes(query)||(c.category||'').toLowerCase().includes(query));
+  if(query) list=list.filter(c=>c.name.toLowerCase().includes(query));
   if(sortAlpha) list=[...list].sort((a,b)=>a.name.localeCompare(b.name,'ru'));
-  let html='';
-  if(currentSourceId){
-    // Внутри страницы источника классы уже отфильтрованы — папка-группировка не нужна (плоский список)
-    html=list.map(c=>renderClassItem(c,c.category||'')).join('');
-  } else {
-    const cats={};
-    list.forEach(c=>{ const cat=c.category||''; if(!cats[cat])cats[cat]=[]; cats[cat].push(c); });
-    const catKeys=Object.keys(cats).sort((a,b)=>{ if(!a)return 1; if(!b)return -1; return a.localeCompare(b,'ru'); });
-    catKeys.forEach(cat=>{
-      if(cat){
-        const collapsed=collapsedCats.has(cat);
-        html+=`<div class="cat-folder" data-cat="${esc(cat)}">
-          <div class="cat-header${collapsed?' collapsed':''}" onclick="toggleCat('${esc(cat)}')">
-            <span class="cat-chevron">▼</span>
-            <span class="cat-folder-icon">📁</span>
-            <span class="cat-name" ondblclick="event.stopPropagation();renameCatInline(this,'${esc(cat)}')">${esc(cat)}</span>
-          </div>
-          <div class="cat-children${collapsed?' hidden':''}">
-            ${cats[cat].map(c=>renderClassItem(c,cat)).join('')}
-          </div>
-        </div>`;
-      } else {
-        html+=cats[cat].map(c=>renderClassItem(c,'')).join('');
-      }
-    });
-  }
-  document.getElementById('class-list').innerHTML=html;
+  let html=list.map(renderClassCard).join('');
+  if(isOwner) html+=`<div class="home-source-card add-source-card" onclick="addClassPrompt()"><div class="home-source-name">+ Добавить класс</div></div>`;
+  const grid=document.getElementById('classes-gallery-grid');
+  if(grid) grid.innerHTML=html;
 }
 
 function toggleCat(cat){
@@ -1584,7 +1594,9 @@ function modalOk(){
     const nc=JSON.parse(JSON.stringify(DEFAULT));
     nc.id=Date.now(); nc.name=v1; nc.desc=v2||'';
     if(currentSourceId) nc.category=currentSourceId;
-    classes.push(nc); closeModal(); save(); selectClass(nc.id);
+    classes.push(nc); closeModal(); save();
+    if(currentSourceId) location.hash='src/'+encodeURIComponent(currentSourceId)+'/classes/'+nc.id;
+    else selectClass(nc.id);
   } else if(modalMode==='source'){
     if(editingSourceId){
       const s=sources.find(x=>x.id===editingSourceId);
@@ -1711,6 +1723,25 @@ function renameCol(cid, span){
   inp.focus(); inp.select();
 }
 
+function renameColGroup(gid, span){
+  const cls=getActive(); if(!cls)return;
+  const grp=(cls.colGroups||[]).find(g=>g.id===gid); if(!grp)return;
+  const prev=grp.name;
+  const inp=document.createElement('input');
+  inp.value=prev;
+  inp.style.cssText='width:'+(Math.max(span.offsetWidth,60))+'px;background:var(--panel);border:1px solid var(--gold);color:var(--text);font-size:inherit;font-family:inherit;padding:0 3px;outline:none;min-width:40px;max-width:200px;text-align:center;';
+  const commit=()=>{
+    const v=inp.value.trim()||prev;
+    grp.name=v; save();
+    span.textContent=v;
+    inp.replaceWith(span);
+  };
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();commit();} if(e.key==='Escape'){inp.value=prev;commit();} });
+  span.replaceWith(inp);
+  inp.focus(); inp.select();
+}
+
 /* TABLE RENDER */
 function colW(cls,colId,def){
   const w=(cls.colWidths||{})[colId];
@@ -1739,7 +1770,7 @@ function renderTable(cls){
     ${hasGroups?`<tr>
       <th colspan="${fixedCount}" data-col="__fixed"></th>
       ${groupRow.map(c=>c.type==='group'
-        ?`<th class="grp-hdr" colspan="${c.span}" data-col="__grp_${c.id}" title="${esc(c.name)}"><div class="col-hdr-inner">${esc(mobileAbbr(c.name))}<span class="grp-del-btn" onclick="delColGroup('${c.id}')">✕</span></div></th>`
+        ?`<th class="grp-hdr" colspan="${c.span}" data-col="__grp_${c.id}" title="${esc(c.name)}"><div class="col-hdr-inner"><span class="col-hdr-name" ondblclick="renameColGroup('${c.id}',this)">${esc(mobileAbbr(c.name))}</span><span class="grp-del-btn" onclick="delColGroup('${c.id}')">✕</span></div></th>`
         :`<th data-col="__solo"></th>`
       ).join('')}
     </tr>`:''}
@@ -1748,7 +1779,7 @@ function renderTable(cls){
       <th data-col="prof" ${colW(cls,'prof',36)}>БВ${rh}</th>
       <th data-col="features" style="width:${cw['features']||180}px">Классовые умения${rh}</th>
       ${normalCols.map(c=>`<th data-col="${c.id}" ${colW(cls,c.id,70)} draggable="true" title="${esc(c.name)}"><div class="col-hdr-inner"><span class="col-drag-handle">⠿</span><span class="col-hdr-name" ondblclick="renameCol('${c.id}',this)">${esc(mobileAbbr(c.name))}</span><span class="del-col-btn" onclick="delCol('${c.id}')">✕</span></div>${rh}</th>`).join('')}
-      ${casterCols.map(c=>`<th data-col="${c.id}" ${c.isSlot?'data-slot':''} ${colW(cls,c.id,c.isSlot?0:60)} title="${esc(c.name)}"><div class="col-hdr-inner">${esc(mobileAbbr(c.name))}</div>${rh}</th>`).join('')}
+      ${casterCols.map(c=>`<th data-col="${c.id}" ${c.isSlot?'data-slot':''} ${colW(cls,c.id,c.isSlot?0:60)} title="${esc(c.name)}"><div class="col-hdr-inner"><span class="col-hdr-name" ondblclick="renameCol('${c.id}',this)">${esc(mobileAbbr(c.name))}</span></div>${rh}</th>`).join('')}
     </tr>
   </thead>`;
   const tbody=`<tbody>${cls.levels.map(lv=>renderLvRow(cls,lv,normalCols,casterCols)).join('')}</tbody>`;
@@ -1768,12 +1799,10 @@ function renderLvRow(cls,lv,normalCols,casterCols){
     return `<td><input class="lv-input slot-input" value="${esc(v)}" oninput="updLvCustom(${lv.lv},'${c.id}',this.value)"></td>`;
   }).join('');
   const featureAbIds=lv.featureAbIds||[];
-  const accentColor=cls.accentColor||null;
   const tags=(lv.features||[]).map((f,fi)=>{
     const abId=featureAbIds[fi];
     if(abId!=null && abId>0){
-      const s=accentColor?`background:${accentColor}1a;border-color:${accentColor}44;color:${accentColor};`:'';
-      return `<span class="feature-tag" draggable="true" data-ab-id="${abId}" style="${s}">${esc(f)}</span>`;
+      return `<span class="feature-tag" draggable="true" data-ab-id="${abId}">${esc(f)}</span>`;
     } else if(abId!=null && abId<0){
       const sl=(cls.subLevels||[]).find(x=>x.id===-abId);
       const sub=sl?(cls.subclasses||[]).find(s=>s.id===sl.subId):null;
@@ -1826,7 +1855,6 @@ function renderAbilities(cls){
   // фильтр: класс всегда + только выбранный подкласс
   const visible=sorted.filter(a=> !a.subId || a.subId===activeSubId );
   return visible.map(a=>{
-    const subOpts=`<option value="">— класс —</option>${subs.map(s=>`<option value="${s.id}"${a.subId===s.id?' selected':''}>${esc(s.name)}</option>`).join('')}`;
     const isSubLvAb=a.slvId!=null;
     const bodyHtml=a.body||'';
     const sub=a.subId?subMap[a.subId]:null;
@@ -1844,7 +1872,6 @@ function renderAbilities(cls){
           ${isSubLvAb?`<span class="ab-sl-hint-line" style="color:${sc?sc+'88':'var(--accent)'}">${esc(sub?.name||'Подкласс')}</span>`:''}
         </span>
         <input class="ab-type-in" value="${esc(a.type)}" placeholder="Тип" oninput="updAb(${a.id},'type',this.value)" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
-        <select class="ab-sub-sel" onchange="updAb(${a.id},'subId',this.value?parseInt(this.value):null)" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">${subOpts}</select>
         <button class="ab-btn del" onclick="event.stopPropagation();delAb(${a.id})">✕</button>
         <span class="ab-toggle">▸</span>
       </div>
@@ -1990,7 +2017,7 @@ function renderMain(){
   ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(180,60,60,0.35);color:#a06060;">${ICO.exit} Выйти</button>` : ''}
   ${_settingsHtml()}
 </div>
-<div class="empty-state"><div class="big"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--muted)" stroke-opacity=".5" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--muted)" stroke-opacity=".25" stroke-width="1"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--muted)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--muted)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--muted)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--muted)" fill-opacity=".5"/><circle cx="32" cy="32" r="4" fill="var(--muted)" fill-opacity=".6"/></svg></div>Выбери класс через «Меню»</div>`;
+<div class="empty-state"><div class="big"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--muted)" stroke-opacity=".5" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--muted)" stroke-opacity=".25" stroke-width="1"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--muted)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--muted)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--muted)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--muted)" fill-opacity=".5"/><circle cx="32" cy="32" r="4" fill="var(--muted)" fill-opacity=".6"/></svg></div><span style="cursor:pointer;" onclick="location.hash=currentSourceId?('src/'+encodeURIComponent(currentSourceId)+'/classes'):''">Выбери класс на странице «Классы»</span></div>`;
     return;
   }
   syncFeatures(cls);
@@ -2010,8 +2037,6 @@ function renderMain(){
   <input class="class-name-input" value="${esc(cls.name)}" placeholder="Название класса" oninput="upd('name',this.value)">
   <div class="class-meta">
     <input class="class-desc-input" value="${esc(cls.desc)}" placeholder="Описание..." oninput="upd('desc',this.value)">
-    <input type="color" class="cls-accent-dot" value="${cls.accentColor||'#4e7a5c'}" oninput="updateClassAccent(this.value)" title="Цвет тегов класса в таблице">
-    <input class="class-cat-input" value="${esc(cls.category||'')}" placeholder="📁 Категория..." oninput="upd('category',this.value)">
   </div>
   <div class="cls-links-wrap">
     ${(cls.links||[]).map(l=>`
@@ -2107,7 +2132,7 @@ function toggleAb(id){
 function addAbility(){
   const cls=getActive(); if(!cls)return;
   const id=Date.now();
-  cls.abilities.push({id,lv:1,name:'Новое умение',type:'Пассивная',subId:null,body:'',open:true,slvId:null});
+  cls.abilities.push({id,lv:1,name:'Новое умение',type:'Пассивная',subId:activeSubId,body:'',open:true,slvId:null});
   syncFeatures(cls); save();
   const list=document.getElementById('abilities-list');
   if(list){list.innerHTML=renderAbilities(cls);}
@@ -2305,10 +2330,42 @@ function execFmt(cmd,val){
 function wrapSelectionTag(tag){
   const sel=window.getSelection(); if(!sel||sel.isCollapsed)return;
   const range=sel.getRangeAt(0);
+  // Toggle off: если выделение уже внутри такого тега — снимаем обёртку вместо повторного оборачивания
+  let node=range.commonAncestorContainer;
+  if(node.nodeType!==1) node=node.parentElement;
+  const existing=node?node.closest(tag):null;
+  if(existing){
+    const ce=existing.closest('.ab-body-ce');
+    const parent=existing.parentNode;
+    while(existing.firstChild) parent.insertBefore(existing.firstChild,existing);
+    parent.removeChild(existing);
+    if(ce){ const id=parseInt(ce.dataset.id); saveCeBody(ce,id); }
+    return;
+  }
   const el=document.createElement(tag);
   try{ range.surroundContents(el); } catch(e){ el.appendChild(range.extractContents()); range.insertNode(el); }
   // save
   const ce=el.closest('.ab-body-ce'); if(ce){ const id=parseInt(ce.dataset.id); saveCeBody(ce,id); }
+}
+
+function toggleHeading(){
+  const cur=(document.queryCommandValue('formatBlock')||'').toLowerCase();
+  document.execCommand('formatBlock',false,cur==='h3'?'p':'h3');
+  saveCeIfActive();
+}
+
+function removeAllFormat(){
+  document.execCommand('removeFormat',false,null);
+  const sel=window.getSelection();
+  if(sel&&sel.rangeCount){
+    let node=sel.getRangeAt(0).commonAncestorContainer;
+    if(node.nodeType!==1) node=node.parentElement;
+    const codeAnc=node?node.closest('code'):null;
+    if(codeAnc){ const p=codeAnc.parentNode; while(codeAnc.firstChild)p.insertBefore(codeAnc.firstChild,codeAnc); p.removeChild(codeAnc); }
+    const headAnc=node?node.closest('h1,h2,h3,h4,h5,h6'):null;
+    if(headAnc) document.execCommand('formatBlock',false,'p');
+  }
+  saveCeIfActive();
 }
 
 function updateFtbState(){
@@ -2371,7 +2428,7 @@ function showCtxMenu(e,el){
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('strikeThrough')"><span class="ctx-icon"><s>S</s></span>Зачёркнутый</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('code')"><span class="ctx-icon">⌨</span>Код</div>`;
   html+=`<div class="ctx-sep"></div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('formatBlock','h3')"><span class="ctx-icon">H</span>Заголовок</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading()"><span class="ctx-icon">H</span>Заголовок</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertUnorderedList')"><span class="ctx-icon">≡</span>Список</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertOrderedList')"><span class="ctx-icon">①</span>Нумер. список</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();insertCeHr()"><span class="ctx-icon">—</span>Разделитель</div>`;
@@ -2392,7 +2449,7 @@ function showCtxMenu(e,el){
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxColorGrid()"><span class="ctx-icon">${ICO.palette}</span>Цвет текста ▸</div>`;
   html+=`<div id="ctx-color-panel" style="display:none"><div class="ctx-color-grid">${fgColors.map(c=>`<div class="ctx-color-dot" style="background:${c}" title="${c}" onmousedown="event.preventDefault();applyForeColor('${c}')"></div>`).join('')}</div><label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">+</span> Свой цвет...<input type="color" class="color-input-overlay" value="#ffffff" onchange="applyForeColorFromInput(this)"></label></div>`;
   html+=`<div class="ctx-sep"></div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('removeFormat')"><span class="ctx-icon">✕</span>Убрать форматирование</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();removeAllFormat()"><span class="ctx-icon">✕</span>Убрать форматирование</div>`;
   menu.innerHTML=html;
   menu.classList.add('vis');
   let x=e.clientX, y=e.clientY;
@@ -2624,6 +2681,8 @@ function mobileAbbr(text){
 const SK_COMP = 'guild-comp-v1';
 let COMP = { categories: [], entries: [], nextId: 1 };
 let compView = 'type'; // 'type' | 'name' | 'level'
+let compSection = 'traits'; // 'traits' | 'maneuvers' | null(=все, легаси-доступ) — какая библиотека открыта
+const COMP_SECTION_LABELS = { traits: 'Черты', maneuvers: 'Приёмы' };
 let compSearch = '';
 let compFilters = { catId: '', level: '', source: '' };
 let compDragMode = false;
@@ -2632,14 +2691,14 @@ let compDetailEdit = false; // false = view mode, true = edit mode
 let compBodyTimer = null;
 
 const DEFAULT_COMP_CATS = [
-  { id: 'origin',     name: 'Черта происхождения',      icon: '⚙', color: '#5a8a5a', order: 0 },
-  { id: 'dark',       name: 'Тёмный дар',               icon: '🦇', color: '#7a4aaa', order: 1 },
-  { id: 'dragonmark', name: 'Черта Драконьей метки',    icon: '✦', color: '#aa6a2a', order: 2 },
-  { id: 'universal',  name: 'Универсальная черта',       icon: '❋', color: '#3a6aaa', order: 3 },
-  { id: 'combat',     name: 'Боевой стиль',             icon: '⚔', color: '#aa3a3a', order: 4 },
-  { id: 'epic',       name: 'Эпический дар',            icon: '✵', color: '#aaaa2a', order: 5 },
-  { id: 'feat',       name: 'Подвиг',                   icon: '🏆', color: '#3aaa6a', order: 6 },
-  { id: 'maneuver',   name: 'Приём',                    icon: '⚡', color: '#3a6aaa', order: 7 },
+  { id: 'origin',     name: 'Черта происхождения',      icon: '⚙', color: '#5a8a5a', order: 0, section: 'traits' },
+  { id: 'dark',       name: 'Тёмный дар',               icon: '🦇', color: '#7a4aaa', order: 1, section: 'traits' },
+  { id: 'dragonmark', name: 'Черта Драконьей метки',    icon: '✦', color: '#aa6a2a', order: 2, section: 'traits' },
+  { id: 'universal',  name: 'Универсальная черта',       icon: '❋', color: '#3a6aaa', order: 3, section: 'traits' },
+  { id: 'combat',     name: 'Боевой стиль',             icon: '⚔', color: '#aa3a3a', order: 4, section: 'traits' },
+  { id: 'epic',       name: 'Эпический дар',            icon: '✵', color: '#aaaa2a', order: 5, section: 'traits' },
+  { id: 'feat',       name: 'Подвиг',                   icon: '🏆', color: '#3aaa6a', order: 6, section: 'traits' },
+  { id: 'maneuver',   name: 'Приём',                    icon: '⚡', color: '#3a6aaa', order: 7, section: 'maneuvers' },
 ];
 
 async function loadComp() {
@@ -2662,7 +2721,7 @@ async function loadComp() {
   if (!COMP.categories || !COMP.categories.length) COMP.categories = JSON.parse(JSON.stringify(DEFAULT_COMP_CATS));
   if (!COMP.entries) COMP.entries = [];
   if (!COMP.nextId) COMP.nextId = 1;
-  COMP.categories.forEach((c,i) => { if (c.order == null) c.order = i; });
+  COMP.categories.forEach((c,i) => { if (c.order == null) c.order = i; if (!c.section) c.section = c.id==='maneuver' ? 'maneuvers' : 'traits'; });
 }
 
 function saveComp() {
@@ -2745,6 +2804,9 @@ function openCompendium() {
   const t=document.getElementById('mob-topbar-title');
   if(t) t.textContent='Компендиум';
   renderCompScreen();
+  // Если переключились между библиотеками (Черты/Приёмы) при открытой панели категорий — обновляем её,
+  // иначе там останется список категорий предыдущей библиотеки.
+  if(document.getElementById('comp-settings-panel').classList.contains('open')) renderCompSettingsPanel();
 }
 
 function closeCompendium() {
@@ -2762,18 +2824,23 @@ function renderCompScreen() {
 }
 
 /* ---------- TOPBAR ---------- */
+function compCatsInSection(){
+  return COMP.categories.filter(c => !compSection || (c.section||'traits')===compSection);
+}
+
 function renderCompTopbar() {
   const tb = document.getElementById('comp-topbar');
-  const cats = [...COMP.categories].sort((a,b) => a.order - b.order);
+  const cats = compCatsInSection().sort((a,b) => a.order - b.order);
   const catOpts = `<option value="">Все категории</option>${cats.map(c => `<option value="${esc(c.id)}"${compFilters.catId===c.id?' selected':''}>${esc(c.icon)} ${esc(c.name)}</option>`).join('')}`;
   const lvlList = [...new Set(COMP.entries.map(e=>e.level).filter(v=>v!=null))].sort((a,b)=>a-b);
   const hasNull = COMP.entries.some(e=>e.level==null);
   const lvlOpts = `<option value="">Уровень</option>${lvlList.map(v=>`<option value="${v}"${compFilters.level===String(v)?' selected':''}>${v}</option>`).join('')}${hasNull?`<option value="null"${compFilters.level==='null'?' selected':''}>—</option>`:''}`;
   const srcList = [...new Set(COMP.entries.map(e=>e.source||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
   const srcOpts = `<option value="">Источник</option>${srcList.map(s=>`<option value="${esc(s)}"${compFilters.source===s?' selected':''}>${esc(s)}</option>`).join('')}`;
+  const libLabel = compSection ? (COMP_SECTION_LABELS[compSection]||'') : 'Все библиотеки';
   tb.innerHTML = `
     <button class="nav-menu-btn nav-toggle-btn" onclick="toggleNavMenu()" title="Меню навигации">${ICO.menu} Меню</button>
-    <button class="comp-back-btn" onclick="closeCompendium()">◀ Классы</button>
+    <span class="comp-lib-title">${esc(libLabel)}</span>
     <div class="comp-search-wrap">
       <span class="comp-search-icon">${ICO.search}</span>
       <input class="comp-search-inp" placeholder="Поиск по разделу" value="${esc(compSearch)}" oninput="compSearch=this.value;renderCompBody()">
@@ -2788,9 +2855,6 @@ function renderCompTopbar() {
     <button class="comp-view-btn${compView==='level'?' active':''}" onclick="compView='level';renderCompTopbar();renderCompLegend();renderCompBody()">Уровень</button>
     <div class="comp-sep"></div>
     <button class="comp-add-btn" onclick="compAddEntry()">+ Добавить</button>
-    <button class="comp-drag-btn${compDragMode?' active':''}" onclick="compToggleDrag()" title="Перемещение записей между категориями">${compDragMode?'🔓 Перемещение вкл':'🔒 Переместить'}</button>
-    <button class="comp-export-btn" onclick="exportCompendium()" title="Скачать компендиум как JSON">⬇ Компендиум</button>
-    <button class="comp-export-btn" onclick="importCompendium()" title="Импортировать компендиум из JSON">⬆ Импорт</button>
     <button class="comp-settings-btn${document.getElementById('comp-settings-panel').classList.contains('open')?' active':''}" onclick="toggleCompSettings()" title="Управление категориями">${ICO.gear}</button>
   `;
 }
@@ -2804,6 +2868,10 @@ function renderCompLegend() {
 /* ---------- FILTER ---------- */
 function compFilterEntries() {
   let list = [...COMP.entries];
+  if (compSection) {
+    const catIds = new Set(compCatsInSection().map(c => c.id));
+    list = list.filter(e => catIds.has(e.catId));
+  }
   const q = compSearch.trim().toLowerCase();
   if (q) list = list.filter(e => (e.name||'').toLowerCase().includes(q) || (e.nameEn||'').toLowerCase().includes(q) || (e.body||'').replace(/<[^>]+>/g,'').toLowerCase().includes(q));
   if (compFilters.catId) list = list.filter(e => e.catId === compFilters.catId);
@@ -2825,18 +2893,38 @@ function renderCompBody() {
 
 function compGetCat(id) { return COMP.categories.find(c => c.id === id) || { name: id, icon: '?', color: '#888', order: 999 }; }
 
+/* ---------- КОЛОНКИ (5 шт, строго по порядку — сверху вниз, затем налево-направо) ----------
+   ВАЖНО: раньше это делалось через CSS column-count:5 на .comp-group-entries — ненадёжно,
+   т.к. column-fill:auto без явной высоты контейнера в браузерах на практике схлопывается
+   в одну колонку (Chromium не может определить высоту "заливки" у auto-height блока).
+   Поэтому колонки режем вручную в JS: делим уже отсортированный список на 5 равных кусков
+   по порядку — это гарантирует ровно 5 колонок и не ломает алфавитную сортировку. */
+function compSplitColumns(htmlItems, cols) {
+  cols = cols || 5;
+  if (!htmlItems.length) return '';
+  const perCol = Math.ceil(htmlItems.length / cols) || 1;
+  let out = '';
+  for (let i = 0; i < cols; i++) {
+    const chunk = htmlItems.slice(i * perCol, (i + 1) * perCol);
+    if (!chunk.length) break;
+    out += `<div class="comp-col">${chunk.join('')}</div>`;
+  }
+  return out;
+}
+
 /* ---------- TYPE VIEW ---------- */
 function renderCompByType(el, entries) {
-  const cats = [...COMP.categories].sort((a,b) => a.order - b.order);
+  const cats = compCatsInSection().sort((a,b) => a.order - b.order);
   let html = '';
   for (const cat of cats) {
     const cEntries = entries.filter(e => e.catId === cat.id).sort((a,b) => (a.order||0)-(b.order||0) || (a.name||'').localeCompare(b.name||'','ru'));
     if (!cEntries.length && (compSearch || compFilters.catId || compFilters.level || compFilters.source)) continue;
-    const entriesHtml = cEntries.map(e => compEntryHtml(e, cat)).join('');
+    const colsHtml = compSplitColumns(cEntries.map(e => compEntryHtml(e, cat)));
     const zoneHtml = compDragMode ? `<div class="comp-drop-zone" data-cat-id="${esc(cat.id)}">⬇ Перетащи сюда</div>` : (!cEntries.length ? `<div class="comp-empty-zone">—</div>` : '');
     html += `<div class="comp-group">
       <div class="comp-group-label" style="color:${cat.color};border-bottom-color:${cat.color}"><span class="cgl-icon">${esc(cat.icon)}</span>${esc(cat.name)}</div>
-      <div class="comp-group-entries" id="cgrp-${esc(cat.id)}">${entriesHtml}${zoneHtml}</div>
+      <div class="comp-group-entries" id="cgrp-${esc(cat.id)}">${colsHtml}</div>
+      ${zoneHtml}
     </div>`;
   }
   el.innerHTML = html || `<div style="padding:40px;text-align:center;color:var(--muted)">Ничего не найдено</div>`;
@@ -2845,15 +2933,15 @@ function renderCompByType(el, entries) {
 /* ---------- NAME VIEW ---------- */
 function renderCompByName(el, entries) {
   const sorted = [...entries].sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
-  let html = '<div class="comp-flat-list">';
+  if (!sorted.length) { el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">Ничего не найдено</div>`; return; }
+  const blocks = [];
   let lastLetter = '';
   for (const e of sorted) {
     const letter = (e.name||'#')[0].toUpperCase();
-    if (letter !== lastLetter) { html += `<div class="comp-alpha-hdr">${esc(letter)}</div>`; lastLetter = letter; }
-    html += compEntryHtml(e, compGetCat(e.catId));
+    if (letter !== lastLetter) { blocks.push(`<div class="comp-alpha-hdr">${esc(letter)}</div>`); lastLetter = letter; }
+    blocks.push(compEntryHtml(e, compGetCat(e.catId)));
   }
-  html += '</div>';
-  el.innerHTML = sorted.length ? html : `<div style="padding:40px;text-align:center;color:var(--muted)">Ничего не найдено</div>`;
+  el.innerHTML = `<div class="comp-flat-list">${compSplitColumns(blocks)}</div>`;
 }
 
 /* ---------- LEVEL VIEW ---------- */
@@ -2868,9 +2956,10 @@ function renderCompByLevel(el, entries) {
   let html = '';
   for (const k of keys) {
     const sorted = groups[k].sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
+    const colsHtml = compSplitColumns(sorted.map(e => compEntryHtml(e, compGetCat(e.catId))));
     html += `<div class="comp-group">
       <div class="comp-group-label" style="color:var(--muted);border-bottom-color:var(--border)">Уровень&nbsp;${esc(k)}</div>
-      <div class="comp-group-entries">${sorted.map(e => compEntryHtml(e, compGetCat(e.catId))).join('')}</div>
+      <div class="comp-group-entries">${colsHtml}</div>
     </div>`;
   }
   el.innerHTML = html || `<div style="padding:40px;text-align:center;color:var(--muted)">Ничего не найдено</div>`;
@@ -2897,7 +2986,7 @@ function renderCompDetail(id) {
   const el = document.getElementById('comp-body');
   const e = COMP.entries.find(x => x.id === id);
   if (!e) { compOpenId = null; renderCompBody(); return; }
-  const cats = [...COMP.categories].sort((a,b) => a.order - b.order);
+  const cats = compCatsInSection().sort((a,b) => a.order - b.order);
   const cat = compGetCat(e.catId);
 
   if (!compDetailEdit) {
@@ -3005,7 +3094,7 @@ function compUpdEntry(id, field, value) {
 
 /* ---------- ADD / DELETE ---------- */
 function compAddEntry() {
-  const cats = [...COMP.categories].sort((a,b) => a.order - b.order);
+  const cats = compCatsInSection().sort((a,b) => a.order - b.order);
   const catId = compFilters.catId || (cats[0] ? cats[0].id : 'origin');
   const id = COMP.nextId++;
   const maxOrd = Math.max(0, ...COMP.entries.filter(e => e.catId === catId).map(e => e.order||0));
@@ -3071,10 +3160,11 @@ function toggleCompSettings() {
 
 function renderCompSettingsPanel() {
   const panel = document.getElementById('comp-settings-panel');
-  const cats = [...COMP.categories].sort((a,b) => a.order - b.order);
+  const cats = compCatsInSection().sort((a,b) => a.order - b.order);
+  const libLabel = compSection ? (COMP_SECTION_LABELS[compSection]||'') : '';
   panel.innerHTML = `
     <div class="comp-sp-head">
-      <span class="comp-sp-title">Категории компендиума</span>
+      <span class="comp-sp-title">Категории${libLabel?' · '+esc(libLabel):''}</span>
       <button class="comp-sp-close" onclick="toggleCompSettings()">✕</button>
     </div>
     <div class="comp-cat-list" id="comp-cat-list">
@@ -3110,7 +3200,7 @@ function compDeleteCat(id) {
 function compAddCat() {
   const id = 'cat_' + Date.now();
   const maxOrd = Math.max(-1, ...COMP.categories.map(c => c.order));
-  COMP.categories.push({ id, name: 'Новая категория', icon: '★', color: '#5a6a7a', order: maxOrd + 1 });
+  COMP.categories.push({ id, name: 'Новая категория', icon: '★', color: '#5a6a7a', order: maxOrd + 1, section: compSection || 'traits' });
   saveComp(); renderCompSettingsPanel(); renderCompTopbar(); renderCompLegend();
 }
 
@@ -3189,33 +3279,30 @@ function renderNavMenu(){
     html += SOURCE_SECTIONS.map(sec=>`<div class="nav-menu-item${activeSection===sec.id?' active':''}" onclick="closeNavMenu();location.hash='src/${esc(currentSourceId)}/${sec.id}'">${esc(sec.label)}</div>`).join('');
   }
   links.innerHTML = html;
-  // Список классов (бывший постоянный сайдбар) показываем в меню только пока открыт раздел "Классы"
-  const showClasses = activeSection==='classes';
-  const block=document.getElementById('nav-menu-classes-block');
-  if(block) block.classList.toggle('show', showClasses);
-  if(showClasses) renderSidebar();
 }
 function toggleNavMenu(){ renderNavMenu(); document.getElementById('nav-menu-overlay').classList.toggle('open'); }
 function closeNavMenu(){ document.getElementById('nav-menu-overlay').classList.remove('open'); }
 
 function routeFromHash(){
   const h = (location.hash || '').replace('#','');
+  if (h === 'classes') {
+    // Legacy-ссылка (до редизайна навигации) — ведём в галерею классов первого источника
+    const sid = sources[0]?.id;
+    if (sid) { location.hash = 'src/'+encodeURIComponent(sid)+'/classes'; return; }
+  }
   const home = document.getElementById('home-view');
   const source = document.getElementById('source-view');
   const app = document.getElementById('app-view');
+  const gallery = document.getElementById('classes-gallery-view');
   home.classList.add('r-hidden');
   source.classList.add('r-hidden');
   app.classList.add('r-hidden');
-  const m = h.match(/^src\/([^/]+)(?:\/(.+))?$/);
+  gallery.classList.add('r-hidden');
+  const m = h.match(/^src\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/);
   const wantsCompendium = !!m && (m[2]==='maneuvers' || m[2]==='styles');
   if (!wantsCompendium && document.body.classList.contains('comp-mode')) closeCompendium(); // сбрасываем "залипший" компендиум при уходе с Приёмов/Боевых стилей
-  if (h === 'classes') {
-    // Legacy-ссылка (до редизайна навигации) — открываем класс-билдер первого источника
-    currentSourceId = sources[0]?.id || null;
-    app.classList.remove('r-hidden');
-    renderSidebar();
-  } else if (m) {
-    const srcId = m[1], section = m[2];
+  if (m) {
+    const srcId = m[1], section = m[2], subPath = m[3];
     currentSourceId = srcId;
     if (!section || section==='reference') {
       renderSourceView(srcId, section);
@@ -3225,12 +3312,21 @@ function routeFromHash(){
       // ВАЖНО: app-view держим скрытым (r-hidden) — #screen-compendium сам разворачивается на весь экран
       // через body.comp-mode CSS. Если снять r-hidden с app-view, оба окажутся видимыми flex-соседями
       // body{display:flex} и поделят экран пополам — именно так выглядел баг, который поймал Adam.
-      renderSidebar();
+      compSection = section==='maneuvers' ? 'maneuvers' : 'traits';
       openCompendium();
-    } else {
-      // classes (и любой другой раздел по умолчанию)
-      app.classList.remove('r-hidden');
+    } else if (section==='classes' && !subPath) {
+      // Галерея классов источника — карточки, клик по карточке открывает класс-билдер (src/<id>/classes/<classId>)
+      renderGalleryHeader(srcId);
       renderSidebar();
+      gallery.classList.remove('r-hidden');
+    } else if (section==='classes' && subPath) {
+      const cid = parseInt(subPath);
+      if (classes.some(c=>c.id===cid)) activeId = cid;
+      app.classList.remove('r-hidden');
+      renderMain();
+    } else {
+      // любой другой раздел по умолчанию
+      app.classList.remove('r-hidden');
     }
   } else {
     currentSourceId = null;
@@ -3238,6 +3334,13 @@ function routeFromHash(){
     home.classList.remove('r-hidden');
   }
   renderNavMenu();
+}
+
+function renderGalleryHeader(srcId){
+  const s = sources.find(x=>x.id===srcId);
+  document.getElementById('gallery-title').textContent = 'Классы' + (s?' · '+s.name:'');
+  const back = document.getElementById('gallery-back-btn');
+  if (back) back.onclick = () => { location.hash = 'src/'+encodeURIComponent(srcId); };
 }
 window.addEventListener('hashchange', routeFromHash);
 
