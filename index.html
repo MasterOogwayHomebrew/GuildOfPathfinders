@@ -14,6 +14,12 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-07 (4) — КОМПАС ВМЕСТО ЭМОДЗИ (частично). Adam указал что на мокапе я показывал кастомный SVG-компас, а в реальном сайте оставил эмодзи ⚔ — приоритетно исправлен именно компас/эмблема (как Adam и просил, "особенно компас"):
+  1) .home-emblem (герой на главной) — эмодзи заменён на inline SVG компас (var(--gold)/var(--accent)/var(--gold2), тот же дизайн что на одобренном мокапе).
+  2) .empty-state .big — иконка пустого состояния (2 вхождения: статический HTML + шаблон внутри renderMain()) заменена на приглушённый SVG-компас (var(--muted)).
+  3) Favicon — заменён с эмодзи-SVG на SVG-компас с захардкоженными hex (CSS-переменные не работают в data-URI фавиконках): фон #141a15, золото #9e7c32, акцент #4e7a5c, gold2 #c49848.
+  ПРОВЕРЕНО ЛОКАЛЬНО: скриншоты home-view и class-builder view (Playwright) — компас отображается корректно, регрессий в остальной вёрстке нет.
+  НЕ СДЕЛАНО (сознательно вне скоупа этого фикса): остальные функциональные эмодзи-иконки (☰ меню, 📚 компендиум ×2, ⚙ настройки ×3, 💬 Discord ×3, 👤 логаут ×2, 🔍 поиск ×2, 🎨 цвет ×2) — отдельный будущий проход.
 2026-09-07 (3) — ГЛАВНАЯ СТРАНИЦА + HASH-РОУТИНГ + ПОЛИРОВКА UI. Adam сообщил что после (2) визуально "тот же сайт" — структура правда не менялась, это ожидаемо. Добавлено:
   1) #home-view — новая домашняя страница (карточки источников, сейчас только laserllama) перед сайдбаром/класс-билдером. #app-view — обёртка вокруг старого .sidebar+#main (весь их внутренний код НЕ ТРОНУТ).
   2) routeFromHash() + window.addEventListener('hashchange',...) — #classes показывает app-view, всё остальное (пусто/#home) показывает home-view. Вызывается в конце _boot().
@@ -33,9 +39,8 @@ CHANGELOG (новое сверху):
 ОТКРЫТЫЕ ЗАДАЧИ (см. память для полного списка):
 - Мобильные сокращения через синтаксис "Термин (СОКР)" — десктоп/мобайл разный текст
 - Дерево Источник→Раздел (Приёмы/Боевые стили/Справочник как отдельные пункты навигации, не просто категории компендиума) — ЕЩЁ НЕ СДЕЛАНО, сейчас есть только Главная(#home)/Классы(#classes)
-- Кастомные SVG-иконки вместо эмодзи — ЕЩЁ НЕ СДЕЛАНО
+- Кастомные SVG-иконки вместо эмодзи — ЧАСТИЧНО (компас/эмблема сделаны 2026-09-07(4)); остались ☰,📚×2,⚙×3,💬×3,👤×2,🔍×2,🎨×2
 - Редактор body: toggle для кнопок форматирования, заголовки H1-H3, кастомный разделитель, экспорт — ЕЩЁ НЕ СДЕЛАНО
-- Редактор body: toggle для кнопок форматирования (bold и т.д. не снимают форматирование при повторном клике), кастомные иконки вместо эмодзи
 ═══════════════════════════════════════════════════════════════════════════════ -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -44,7 +49,7 @@ CHANGELOG (новое сверху):
 <meta name="description" content="Гильдия Путеискателей. Homebrew tool by Master Oogway.">
 <meta name="generator" content="Гильдия Путеискателей — оригинальный инструмент Master Oogway">
 <title>Гильдия Путеискателей</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='10' fill='%23141a15'/><circle cx='32' cy='32' r='27' stroke='%239e7c32' stroke-opacity='.6' stroke-width='2'/><path d='M32 8L36 24L32 20L28 24Z' fill='%239e7c32'/><path d='M32 56L28 40L32 44L36 40Z' fill='%239e7c32' fill-opacity='.6'/><path d='M56 32L40 28L44 32L40 36Z' fill='%239e7c32' fill-opacity='.6'/><path d='M8 32L24 36L20 32L24 28Z' fill='%239e7c32' fill-opacity='.6'/><circle cx='32' cy='32' r='5' fill='%234e7a5c'/><circle cx='32' cy='32' r='2.5' fill='%23c49848'/></svg>">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 <style>
 :root{--bg:#141a15;--sidebar-bg:#182019;--panel:#1c2620;--panel2:#223028;--border:#2c3d30;--gold:#9e7c32;--gold2:#c49848;--text:#ded4b8;--muted:#a89e82;--accent:#4e7a5c;--sub:#8a6a3a;--font:'Calibri','Candara','Segoe UI',Arial,sans-serif;--font-head:'Cinzel',var(--font);--font-body:'Cormorant Garamond',Georgia,serif;--ui-fs:13px;--table-fs:0.85em;--radius:6px;--radius-sm:4px;--radius-pill:20px;}
@@ -357,7 +362,8 @@ input[type=color].cls-accent-dot::-webkit-color-swatch{border:none;border-radius
 .btn-g{border-color:rgba(158,124,50,0.5);color:var(--gold);}
 .btn-g:hover{background:rgba(158,124,50,0.1);}
 .empty-state{text-align:center;padding:80px 20px;color:var(--muted);font-style:italic;}
-.empty-state .big{font-size:32px;margin-bottom:14px;color:var(--border);}
+.empty-state .big{width:44px;height:44px;margin:0 auto 14px;opacity:0.5;}
+.empty-state .big svg{width:100%;height:100%;}
 body.col-resizing{cursor:col-resize!important;}
 body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
 /* Мобильный блок атрибутов — скрыт на десктопе */
@@ -624,7 +630,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 #home-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
 .home-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:64px 24px 44px;position:relative;overflow:hidden;}
 .home-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 0%,rgba(78,122,92,0.12),transparent 70%);pointer-events:none;}
-.home-emblem{font-size:2.6em;color:var(--gold);opacity:0.85;margin-bottom:14px;}
+.home-emblem{width:64px;height:64px;opacity:0.9;margin-bottom:14px;}
+.home-emblem svg{width:100%;height:100%;}
 .home-title{font-family:var(--font-head);font-size:2em;font-weight:700;color:var(--gold2);letter-spacing:0.05em;line-height:1.15;text-wrap:balance;margin-bottom:8px;}
 .home-subtitle{font-family:var(--font-body);font-size:1.15em;font-style:italic;color:var(--muted);margin-bottom:18px;}
 .home-badge{display:inline-flex;align-items:center;gap:6px;font-size:0.7em;font-family:var(--font);letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);background:rgba(158,124,50,0.12);border:1px solid rgba(158,124,50,0.3);border-radius:var(--radius-pill);padding:4px 14px;}
@@ -660,7 +667,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
      главную, а не пустоту. app-view наоборот скрыт по умолчанию, показывается только через JS. -->
 <div id="home-view">
   <div class="home-hero">
-    <div class="home-emblem">⚔</div>
+    <div class="home-emblem"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--gold)" stroke-opacity=".4" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--gold)" stroke-opacity=".2" stroke-width="1"/><circle cx="32" cy="32" r="12" stroke="var(--gold)" stroke-opacity=".15" stroke-width=".8"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--gold)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--gold)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--gold)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--gold)" fill-opacity=".5"/><path d="M50 14L40 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 50L24 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 14L24 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M50 50L40 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><circle cx="32" cy="32" r="5" fill="var(--accent)" fill-opacity=".6"/><circle cx="32" cy="32" r="2.5" fill="var(--gold2)" fill-opacity=".9"/></svg></div>
     <h1 class="home-title">Гильдия Путеискателей</h1>
     <p class="home-subtitle">Переводы хомбрю-материалов для Dungeons &amp; Dragons 5e</p>
     <div class="home-badge">Неофициальные переводы · Только русский язык</div>
@@ -717,7 +724,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 </div>
 
 <div class="main" id="main">
-  <div class="empty-state"><div class="big">⚔</div>Выбери класс из списка слева</div>
+  <div class="empty-state"><div class="big"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--muted)" stroke-opacity=".5" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--muted)" stroke-opacity=".25" stroke-width="1"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--muted)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--muted)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--muted)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--muted)" fill-opacity=".5"/><circle cx="32" cy="32" r="4" fill="var(--muted)" fill-opacity=".6"/></svg></div>Выбери класс из списка слева</div>
 </div>
 
 </div><!-- /#app-view -->
@@ -1955,7 +1962,7 @@ function renderMain(){
   ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(66,133,244,0.4);color:#4285f4;">👤 Выйти</button>` : ''}
   ${_settingsHtml()}
 </div>
-<div class="empty-state"><div class="big">⚔</div>Выбери класс из списка слева</div>`;
+<div class="empty-state"><div class="big"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--muted)" stroke-opacity=".5" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--muted)" stroke-opacity=".25" stroke-width="1"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--muted)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--muted)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--muted)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--muted)" fill-opacity=".5"/><circle cx="32" cy="32" r="4" fill="var(--muted)" fill-opacity=".6"/></svg></div>Выбери класс из списка слева</div>`;
     return;
   }
   syncFeatures(cls);
