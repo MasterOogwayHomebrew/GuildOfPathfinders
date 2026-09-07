@@ -14,6 +14,14 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-07 (3) — ГЛАВНАЯ СТРАНИЦА + HASH-РОУТИНГ + ПОЛИРОВКА UI. Adam сообщил что после (2) визуально "тот же сайт" — структура правда не менялась, это ожидаемо. Добавлено:
+  1) #home-view — новая домашняя страница (карточки источников, сейчас только laserllama) перед сайдбаром/класс-билдером. #app-view — обёртка вокруг старого .sidebar+#main (весь их внутренний код НЕ ТРОНУТ).
+  2) routeFromHash() + window.addEventListener('hashchange',...) — #classes показывает app-view, всё остальное (пусто/#home) показывает home-view. Вызывается в конце _boot().
+  3) ВАЖНО (защита от белого экрана): home-view видна по умолчанию БЕЗ JS (нет r-hidden в html), app-view скрыт по умолчанию. Сразу после закрытия #app-view — синхронный inline <script> (до Firebase-тегов) который проверяет location.hash==='#classes' и мгновенно переключает видимость ДО того как firebase/остальной JS успеет упасть. Т.е. даже если Firebase не загрузится (как в моём локальном тесте — сеть недоступна) сайт всё равно показывает хоть что-то осмысленное, а не пустоту.
+  4) Клик на "ГИЛЬДИЯ ПУТЕИСКАТЕЛЕЙ" в action-bar (оба места) → location.hash='' → возврат на главную.
+  5) Добавлены --radius/--radius-sm/--radius-pill в :root, применены к кнопкам/карточкам/пилюлям/модалкам/полям ввода (.act-btn,.add-class-btn,.class-item,.feature-tag,.sub-tab,.add-sub-btn,.sub-editor,.ability-card+box-shadow,.ab-body-ce,.settings-panel,.modal,.modal-input) — раньше было 0 везде, плоско. Это НЕ затрагивает JS/логику, чисто CSS.
+  ПРОВЕРЕНО ЛОКАЛЬНО (без доступа к живому Firestore): написал QA-скрипт на Playwright — стаб firebase + инъекция тестового класса напрямую в переменную classes[], вызов applyTheme()+renderSidebar()+renderMain()+routeFromHash(). Оба состояния (#home и #classes с реальными данными — таблица уровней, умения, подклассы) визуально подтверждены скриншотами ДО отправки Adam'у. Скрипты не входят в деплой, лежали в /home/claude на стороне Claude.
+  НЕ СДЕЛАНО: дерево Источник→Раздел (сейчас только один плоский экран "Классы", нет отдельных разделов Приёмы/Боевые стили/Справочник в навигации — это по-прежнему через compGetCat/openCompendium как раньше), кастомные SVG-иконки вместо эмодзи, toggle для кнопок форматирования в редакторе.
 2026-09-07 (2) — ПАЛИТРА "НЕФРИТ" ВНЕДРЕНА. :root, THEME_DEFAULTS и пресет THEME_PRESETS[id='jade'] переведены на новые значения (--bg:#141a15,--gold:#9e7c32 и т.д. — см. :root на верху style). ВАЖНО: THEME_DEFAULTS — это только fallback, если у Firestore cfg.themeVars уже что-то сохранено (кто-то раньше кликал пресет/крутил цвета в настройках) — оно перекроет новые дефолты. Если после деплоя цвета не поменялись — открыть Настройки (⚙) → кнопка "Сброс" (resetTheme()) или кликнуть пресет "Нефрит" вручную.
   Также заменены все хардкод-rgba, завязанные на старые цвета: rgba(184,152,42|201,168,50,*)→rgba(158,124,50,*) [золото], rgba(74,96,128,*)→rgba(78,122,92,*) [--accent], rgba(106,74,138,*)→rgba(138,106,58,*) [--sub]. Оба градиента .sidebar (десктоп + мобильный drawer) тоже перекрашены в нефритовые тона (были захардкожены отдельно от переменных).
   Шрифты: добавлен Google Fonts линк (Cinzel + Cormorant Garamond), новые переменные --font-head/--font-body в :root. Cinzel применён на: .sidebar-label, .class-item-name, .action-bar-title, .class-name-input, .ab-name-disp, .comp-group-label. Cormorant Garamond на: .class-desc-input, .ab-body-ce (текст умений/описаний). Остальной UI (кнопки, инпуты, таблицы) — на var(--font) как раньше, сознательно не трогал чтобы не сломать плотную вёрстку мелких элементов.
@@ -24,7 +32,7 @@ CHANGELOG (новое сверху):
 
 ОТКРЫТЫЕ ЗАДАЧИ (см. память для полного списка):
 - Мобильные сокращения через синтаксис "Термин (СОКР)" — десктоп/мобайл разный текст
-- Редизайн навигации: hash-routing, дерево Источник→Раздел (сейчас плоская структура) — ЕЩЁ НЕ СДЕЛАНО
+- Дерево Источник→Раздел (Приёмы/Боевые стили/Справочник как отдельные пункты навигации, не просто категории компендиума) — ЕЩЁ НЕ СДЕЛАНО, сейчас есть только Главная(#home)/Классы(#classes)
 - Кастомные SVG-иконки вместо эмодзи — ЕЩЁ НЕ СДЕЛАНО
 - Редактор body: toggle для кнопок форматирования, заголовки H1-H3, кастомный разделитель, экспорт — ЕЩЁ НЕ СДЕЛАНО
 - Редактор body: toggle для кнопок форматирования (bold и т.д. не снимают форматирование при повторном клике), кастомные иконки вместо эмодзи
@@ -39,7 +47,7 @@ CHANGELOG (новое сверху):
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 <style>
-:root{--bg:#141a15;--sidebar-bg:#182019;--panel:#1c2620;--panel2:#223028;--border:#2c3d30;--gold:#9e7c32;--gold2:#c49848;--text:#ded4b8;--muted:#a89e82;--accent:#4e7a5c;--sub:#8a6a3a;--font:'Calibri','Candara','Segoe UI',Arial,sans-serif;--font-head:'Cinzel',var(--font);--font-body:'Cormorant Garamond',Georgia,serif;--ui-fs:13px;--table-fs:0.85em;}
+:root{--bg:#141a15;--sidebar-bg:#182019;--panel:#1c2620;--panel2:#223028;--border:#2c3d30;--gold:#9e7c32;--gold2:#c49848;--text:#ded4b8;--muted:#a89e82;--accent:#4e7a5c;--sub:#8a6a3a;--font:'Calibri','Candara','Segoe UI',Arial,sans-serif;--font-head:'Cinzel',var(--font);--font-body:'Cormorant Garamond',Georgia,serif;--ui-fs:13px;--table-fs:0.85em;--radius:6px;--radius-sm:4px;--radius-pill:20px;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;font-size:var(--ui-fs);overflow-x:hidden;}
 
@@ -72,7 +80,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .cat-rename-inp{flex:1;background:var(--panel2);border:1px solid var(--gold);color:var(--text);font-size:0.85em;padding:1px 4px;outline:none;font-family:var(--font);min-width:0;}
 .cat-children{padding-left:12px;}
 .cat-children.hidden{display:none;}
-.class-item{padding:3px 6px 3px 4px;cursor:pointer;display:flex;align-items:center;gap:5px;border-radius:3px;transition:background .1s;overflow:hidden;}
+.class-item{padding:4px 7px 4px 5px;cursor:pointer;display:flex;align-items:center;gap:5px;border-radius:var(--radius-sm);transition:background .1s;overflow:hidden;}
 .class-item:hover{background:rgba(255,255,255,0.06);}
 .class-item.active{background:rgba(158,124,50,0.13);}
 .class-item.drag-over{background:rgba(158,124,50,0.1);outline:1px dashed rgba(158,124,50,0.4);}
@@ -84,7 +92,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .ft-label{display:block;font-size:1em;font-weight:700;}
 .ft-hint{display:block;font-size:0.82em;color:var(--muted);font-style:italic;margin-top:1px;opacity:0.8;}
 .ab-sl-label{font-size:0.69em;color:var(--sub);background:rgba(138,106,58,0.12);border:1px solid rgba(138,106,58,0.22);padding:1px 5px;white-space:nowrap;flex-shrink:0;}
-.add-class-btn{margin:10px;padding:9px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.77em;letter-spacing:1px;text-align:center;transition:all .15s;white-space:nowrap;font-family:var(--font);}
+.add-class-btn{margin:10px;padding:9px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.77em;letter-spacing:1px;text-align:center;transition:all .15s;white-space:nowrap;font-family:var(--font);border-radius:var(--radius-sm);}
 .add-class-btn:hover,.add-class-btn.drag-over{border-color:var(--gold);color:var(--gold);}
 .add-class-btn.drag-over{border-style:solid;background:rgba(158,124,50,0.07);}
 .sidebar-author{padding:7px 10px 8px;font-size:0.65em;color:var(--text);letter-spacing:1px;border-top:1px solid var(--border);text-align:center;opacity:0.55;flex-shrink:0;white-space:nowrap;overflow:hidden;}
@@ -98,7 +106,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 /* ACTION BAR */
 .action-bar{display:flex;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);background:var(--sidebar-bg);align-items:center;flex-wrap:wrap;}
 .action-bar-title{font-family:var(--font-head);font-size:0.69em;letter-spacing:3px;color:var(--gold2);text-transform:uppercase;flex:1;font-weight:700;opacity:0.85;}
-.act-btn{font-size:0.85em;padding:4px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);}
+.act-btn{font-size:0.85em;padding:4px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .act-btn:hover{border-color:var(--gold);color:var(--gold);}
 .act-btn.export{border-color:rgba(78,122,92,0.4);color:var(--accent);}
 .act-btn.export:hover{border-color:var(--accent);background:rgba(78,122,92,0.1);}
@@ -171,7 +179,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .lv-input.slot-input{color:var(--accent);}
 .lv-input.slot-input:focus{color:var(--gold2);}
 .feature-tags{display:flex;flex-wrap:wrap;gap:2px;}
-.feature-tag{font-size:0.88em;padding:2px 5px;background:transparent;border:1px solid var(--accent);color:var(--accent);transition:all .15s;white-space:nowrap;font-family:var(--font);opacity:0.85;}
+.feature-tag{font-size:0.88em;padding:2px 8px;background:transparent;border:1px solid var(--accent);color:var(--accent);transition:all .15s;white-space:nowrap;font-family:var(--font);opacity:0.85;border-radius:var(--radius-pill);}
 .feature-tag.sub-tag{opacity:0.85;}
 .feature-tag[data-ab-id]{cursor:pointer;}
 .feature-tag[data-ab-id]:hover{background:rgba(78,122,92,0.22);}
@@ -196,12 +204,12 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 
 /* SUBCLASSES */
 .sub-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
-.sub-tab{font-size:0.77em;letter-spacing:1px;padding:5px 12px;border:1px solid rgba(200,200,230,0.22);background:rgba(255,255,255,0.06);color:var(--text);cursor:pointer;transition:all .15s;font-family:var(--font);}
+.sub-tab{font-size:0.77em;letter-spacing:1px;padding:5px 12px;border:1px solid rgba(200,200,230,0.22);background:rgba(255,255,255,0.06);color:var(--text);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
 .sub-tab:hover{border-color:var(--sub);color:var(--sub);}
 .sub-tab.active{border-color:var(--sub);color:var(--sub);background:rgba(138,106,58,0.08);}
-.add-sub-btn{font-size:0.77em;letter-spacing:1px;padding:5px 10px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);}
+.add-sub-btn{font-size:0.77em;letter-spacing:1px;padding:5px 10px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
 .add-sub-btn:hover{border-color:var(--sub);color:var(--sub);}
-.sub-editor{background:var(--panel);border:1px solid var(--border);padding:12px;margin-bottom:10px;}
+.sub-editor{background:var(--panel);border:1px solid var(--border);padding:12px;margin-bottom:10px;border-radius:var(--radius);}
 .sub-editor-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
 .sub-name{font-size:0.85em;letter-spacing:2px;color:var(--sub);font-weight:700;cursor:text;}
 .sub-name-inp{font-size:0.85em;letter-spacing:2px;font-weight:700;background:transparent;border:none;border-bottom:1px solid var(--sub);outline:none;color:var(--sub);font-family:var(--font);min-width:180px;}
@@ -219,7 +227,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 
 /* ABILITIES */
 .abilities-list{display:flex;flex-direction:column;gap:2px;}
-.ability-card{background:var(--panel);border:1px solid var(--border);border-left:2px solid var(--border);}
+.ability-card{background:var(--panel);border:1px solid var(--border);border-left:2px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.2);}
 .ability-header{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;user-select:none;}
 .ability-header:hover{background:rgba(255,255,255,0.02);}
 .drag-handle{display:none;}
@@ -241,7 +249,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ability-card.open .ability-body-wrap{display:block;}
 
 /* Rich text editor */
-.ab-body-ce{width:100%;background:rgba(0,0,0,0.18);border:1px solid var(--border);outline:none;font-size:1.08em;color:#c8c0a8;line-height:1.7;padding:7px 10px;min-height:44px;font-family:var(--font-body);word-wrap:break-word;overflow-wrap:break-word;}
+.ab-body-ce{width:100%;background:rgba(0,0,0,0.18);border:1px solid var(--border);outline:none;font-size:1.08em;color:#c8c0a8;line-height:1.7;padding:7px 10px;min-height:44px;font-family:var(--font-body);word-wrap:break-word;overflow-wrap:break-word;border-radius:var(--radius-sm);}
 .ab-body-ce:focus{border-color:var(--gold);}
 .ab-body-ce p{margin:0 0 2px 0;}
 .ab-body-ce b,.ab-body-ce strong{color:var(--text);}
@@ -294,7 +302,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 /* Settings panel */
 .settings-btn{font-size:0.92em;padding:4px 9px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);position:relative;}
 .settings-btn:hover,.settings-btn.open{border-color:var(--gold);color:var(--gold);}
-.settings-panel{position:absolute;top:calc(100% + 6px);right:0;background:var(--panel2);border:1px solid var(--border);box-shadow:0 6px 24px rgba(0,0,0,0.7);z-index:400;min-width:220px;padding:8px 0;display:none;}
+.settings-panel{position:absolute;top:calc(100% + 6px);right:0;background:var(--panel2);border:1px solid var(--border);box-shadow:0 6px 24px rgba(0,0,0,0.7);z-index:400;min-width:220px;padding:8px 0;display:none;border-radius:var(--radius);}
 .settings-panel.vis{display:block;}
 .sp-section{padding:6px 14px 2px;font-size:0.65em;letter-spacing:2px;color:var(--muted);text-transform:uppercase;font-weight:700;}
 .sp-row{display:flex;align-items:center;gap:6px;padding:5px 14px;}
@@ -339,9 +347,9 @@ input[type=color].cls-accent-dot::-webkit-color-swatch{border:none;border-radius
 /* MODAL */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--panel2);border:1px solid var(--gold);padding:24px;width:340px;max-width:90vw;}
+.modal{background:var(--panel2);border:1px solid var(--gold);padding:24px;width:340px;max-width:90vw;border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,0.6);}
 .modal-title{font-size:1em;color:var(--gold);letter-spacing:2px;margin-bottom:14px;font-weight:700;}
-.modal-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 11px;font-size:1em;outline:none;margin-bottom:10px;font-family:var(--font);}
+.modal-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 11px;font-size:1em;outline:none;margin-bottom:10px;font-family:var(--font);border-radius:var(--radius-sm);}
 .modal-input:focus{border-color:var(--gold);}
 .modal-btns{display:flex;gap:8px;justify-content:flex-end;}
 .btn{font-size:0.77em;letter-spacing:1px;padding:7px 13px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);}
@@ -608,6 +616,36 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .welcome-close-btn{padding:7px 22px;background:transparent;border:1px solid var(--gold);color:var(--gold);font-size:0.88em;cursor:pointer;font-family:var(--font);transition:all .15s;letter-spacing:1px;}
 .welcome-close-btn:hover{background:rgba(158,124,50,0.1);}
 .welcome-noshow{display:flex;align-items:center;gap:6px;font-size:0.8em;color:var(--muted);cursor:pointer;user-select:none;}
+
+/* ═══ HOME VIEW (2026-09-07, hash-routing #home / #classes) ═══ */
+#app-view{display:flex;width:100%;}
+#app-view.r-hidden{display:none;}
+#home-view.r-hidden{display:none;}
+#home-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
+.home-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:64px 24px 44px;position:relative;overflow:hidden;}
+.home-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 0%,rgba(78,122,92,0.12),transparent 70%);pointer-events:none;}
+.home-emblem{font-size:2.6em;color:var(--gold);opacity:0.85;margin-bottom:14px;}
+.home-title{font-family:var(--font-head);font-size:2em;font-weight:700;color:var(--gold2);letter-spacing:0.05em;line-height:1.15;text-wrap:balance;margin-bottom:8px;}
+.home-subtitle{font-family:var(--font-body);font-size:1.15em;font-style:italic;color:var(--muted);margin-bottom:18px;}
+.home-badge{display:inline-flex;align-items:center;gap:6px;font-size:0.7em;font-family:var(--font);letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);background:rgba(158,124,50,0.12);border:1px solid rgba(158,124,50,0.3);border-radius:var(--radius-pill);padding:4px 14px;}
+.home-body{max-width:960px;margin:0 auto;padding:0 28px 80px;}
+.home-section-label{font-family:var(--font-head);font-size:0.72em;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+.home-section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(158,124,50,0.3),transparent);}
+.home-sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+.home-source-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:22px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+.home-source-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--gold),var(--accent));opacity:0;transition:opacity .2s;}
+.home-source-card:hover{border-color:var(--accent);background:var(--panel2);}
+.home-source-card:hover::before{opacity:0.7;}
+.home-source-name{font-family:var(--font-head);font-size:1.05em;font-weight:600;color:var(--gold2);letter-spacing:0.04em;margin-bottom:6px;}
+.home-source-desc{font-family:var(--font-body);font-size:1em;color:var(--muted);line-height:1.5;margin-bottom:14px;}
+.home-source-stats{display:flex;gap:8px;flex-wrap:wrap;}
+.home-stat-tag{font-size:0.72em;font-family:var(--font);color:var(--accent);background:rgba(78,122,92,0.12);border:1px solid rgba(78,122,92,0.3);border-radius:var(--radius-sm);padding:2px 9px;letter-spacing:0.03em;}
+.home-source-card.soon{opacity:0.45;cursor:default;border-style:dashed;}
+.home-source-card.soon:hover{background:var(--panel);border-color:var(--border);}
+.home-source-card.soon:hover::before{opacity:0;}
+.home-soon-label{font-size:0.68em;font-family:var(--font);letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 8px;}
+.home-footer{text-align:center;padding:16px;font-size:0.72em;color:var(--muted);opacity:0.6;letter-spacing:0.05em;}
+.action-bar-title{cursor:pointer;}
 </style>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -615,6 +653,40 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
+
+<!-- ═══ ГЛАВНАЯ (домашняя) СТРАНИЦА — hash-routing, см. routeFromHash() ═══
+     ВАЖНО: home-view видна по умолчанию (без r-hidden в разметке) — это защита от белого экрана,
+     если JS/Firebase не загрузится (сеть, блокировщики): пользователь всё равно увидит статичную
+     главную, а не пустоту. app-view наоборот скрыт по умолчанию, показывается только через JS. -->
+<div id="home-view">
+  <div class="home-hero">
+    <div class="home-emblem">⚔</div>
+    <h1 class="home-title">Гильдия Путеискателей</h1>
+    <p class="home-subtitle">Переводы хомбрю-материалов для Dungeons &amp; Dragons 5e</p>
+    <div class="home-badge">Неофициальные переводы · Только русский язык</div>
+  </div>
+  <div class="home-body">
+    <div class="home-section-label">Источники материалов</div>
+    <div class="home-sources-grid">
+      <div class="home-source-card" onclick="location.hash='classes'">
+        <div class="home-source-name">laserllama</div>
+        <div class="home-source-desc">Альтернативные классы D&amp;D 5e с расширенными механиками и подклассами</div>
+        <div class="home-source-stats">
+          <span class="home-stat-tag">Классы</span>
+          <span class="home-stat-tag">Компендиум приёмов</span>
+        </div>
+      </div>
+      <div class="home-source-card soon">
+        <div class="home-source-name">Новый источник</div>
+        <div class="home-source-desc">Здесь появится следующий переведённый автор</div>
+        <div class="home-source-stats"><span class="home-soon-label">Скоро</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="home-footer">© Master Oogway · Гильдия Путеискателей</div>
+</div>
+
+<div id="app-view" class="r-hidden">
 
 <!-- Мобильный: фиксированный топ-бар и подложка под drawer (скрыты на десктопе) -->
 <div id="mob-topbar" style="display:none">
@@ -647,6 +719,18 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <div class="main" id="main">
   <div class="empty-state"><div class="big">⚔</div>Выбери класс из списка слева</div>
 </div>
+
+</div><!-- /#app-view -->
+
+<!-- Синхронный мини-роутер, независимый от Firebase/остального JS — защита от белого экрана.
+     Срабатывает мгновенно при парсинге HTML, ДО загрузки Firebase-скриптов ниже. Если сеть/Firebase
+     упадёт, при заходе на #classes всё равно покажется статичный каркас класс-билдера, а не пусто. -->
+<script>
+if (location.hash === '#classes') {
+  document.getElementById('home-view').classList.add('r-hidden');
+  document.getElementById('app-view').classList.remove('r-hidden');
+}
+</script>
 
 <!-- Floating format toolbar -->
 <div class="ab-float-toolbar" id="float-toolbar">
@@ -1866,7 +1950,7 @@ function renderMain(){
   if(!cls){
     main.innerHTML=`
 <div class="action-bar">
-  <span class="action-bar-title">Гильдия Путеискателей</span>
+  <span class="action-bar-title" onclick="location.hash=''" title="На главную">Гильдия Путеискателей</span>
   <a class="act-btn" href="https://discord.gg/WXRnWaZ7K" target="_blank" rel="noopener noreferrer" title="Дискорд сервер" style="border-color:rgba(88,101,242,0.5);color:#7289da;text-decoration:none;">💬 Discord</a>
   ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(66,133,244,0.4);color:#4285f4;">👤 Выйти</button>` : ''}
   ${_settingsHtml()}
@@ -1880,7 +1964,7 @@ function renderMain(){
 
   main.innerHTML=`
 <div class="action-bar">
-  <span class="action-bar-title">Гильдия Путеискателей</span>
+  <span class="action-bar-title" onclick="location.hash=''" title="На главную">Гильдия Путеискателей</span>
 
   <button class="act-btn edit-only" onclick="exportClassesJSON()" title="Скачать все классы как JSON">⬇ JSON</button>
   <button class="act-btn edit-only" onclick="importClassesJSON()" title="Импортировать классы из JSON (слияние по id)">⬆ Импорт</button>
@@ -2968,6 +3052,23 @@ loadScale(); applyScale();
 loadFontSize(); applyFontSize();
 loadTableFs(); applyTableFs();
 
+/* ═══ HASH ROUTER (Главная ⇄ Классы), добавлено 2026-09-07 ═══
+   #classes → показать #app-view (сайдбар+класс-билдер), иначе (пусто/#home) → #home-view.
+   Не трогает Firestore/save/render логику — просто show/hide двух верхнеуровневых div. */
+function routeFromHash(){
+  const h = (location.hash || '').replace('#','');
+  const home = document.getElementById('home-view');
+  const app = document.getElementById('app-view');
+  if (h === 'classes') {
+    home.classList.add('r-hidden');
+    app.classList.remove('r-hidden');
+  } else {
+    app.classList.add('r-hidden');
+    home.classList.remove('r-hidden');
+  }
+}
+window.addEventListener('hashchange', routeFromHash);
+
 async function _boot() {
   applyTheme(); // применяем дефолтные переменные; Firestore перетрёт после загрузки
   loadLayout();
@@ -2978,6 +3079,7 @@ async function _boot() {
   renderMain();
   initSidebarDrag();
   if (!isOwner) applyROMode();
+  routeFromHash(); // показать главную или класс-билдер в зависимости от location.hash
   setTimeout(showWelcome, 600);
 }
 
