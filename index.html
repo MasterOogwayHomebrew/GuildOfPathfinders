@@ -14,6 +14,21 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-07 (12) — СВОИ КАРТИНКИ-ЛОГОТИПЫ ДЛЯ ИСТОЧНИКОВ/КЛАССОВ/КАТЕГОРИЙ КОМПЕНДИУМА (вместо/вместе с эмодзи), ПРИГЛУШЁННЫЙ ФИЛЬТР. Adam спросил "картинки наши собственные надо бы вместо эможи... как мне их добавлять?" — выбрал (после уточняющего вопроса) вариант "картинка лежит в его же репозитории рядом с index.html, путь просто вписывается в поле", затем прислал пример (фиолетовый бейдж laserllama) и попросил и для карточек источников/классов тоже, плюс "приглушённая картинка... типа фильтра поверх":
+  1) Категории компендиума — новое поле `cat.iconImg` (путь/URL), заполняется в панели категорий (⚙) новым текстовым полем под основной строкой категории (двухрядная карточка `.comp-cat-row1`/`.comp-cat-row2`, т.к. в 300px панели место кончилось) с мини-превью. Новый helper `compCatIconHtml(cat, sizeEm)` — единая точка рендера иконки категории (картинка ИЛИ эмодзи `cat.icon` как фолбэк), используется во всех 3 местах, где раньше был голый `esc(cat.icon)`: заголовок группы в списке, значок записи, шапка детального вида. В `<select>`-дропдаунах (фильтр категорий, выбор категории при добавлении записи) картинку показать нельзя (браузер не рендерит `<img>` внутри `<option>`) — там остался текстовый fallback.
+  2) Источники (`sources[].img`) и классы (`classes[].img`) — то же самое поле, тот же принцип. Модальное окно (`#modal`) получило 3-е поле `#modal-inp3` ("Путь к картинке") — `openModal()` теперь принимает необязательный `p3`, `addSourcePrompt`/`editSourcePrompt`/`addClassPrompt` его используют. КСТАТИ, до этого захода у существующего класса вообще не было способа отредактировать название/описание из галереи (только создать новый или зайти внутрь билдера) — добавлена `editClassPrompt(id)` (⚙-иконка на карточке класса, `.class-gallery-edit-btn`, тот же паттерн что у источников) — заодно закрыла этот пробел.
+  3) ПРИГЛУШЁННЫЙ ФИЛЬТР — Adam: "такую приглушённую картинку чтобы не выделялась сильно на общем виде сайта, типа фильтра поверх картинки". Новый класс `.site-badge-img{filter:grayscale(35%) saturate(0.7) brightness(0.82) contrast(1.05);opacity:0.88}` — накладывается на ВСЕ пользовательские картинки (источники/классы/категории компендиума) единообразно, лёгкое просветление при наведении на карточку источника (`.home-source-card:hover .site-badge-img`). Мини-превью в самой панели настроек категорий (админский thumbnail рядом с полем ввода) фильтром НЕ накрыто намеренно — чтобы Adam видел картинку "как есть" при редактировании, а не в приглушённом виде.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, тестовые PNG + реальный присланный Adam бейдж laserllama): бейдж на карточке источника и карточке класса рендерится с применённым CSS-фильтром (проверено через getComputedStyle), редактирование существующего класса через новую ⚙-кнопку (префилл полей + сохранение картинки), fallback на эмодзи для категорий компендиума без iconImg. Ошибок в консоли нет.
+2026-09-07 (11) — ФИКС ПРОПАВШИХ КЛАССОВ, ГАЛЕРЕЯ БЕЗ ПОИСКА/СОРТИРОВКИ, АККОРДЕОН НА ГЛАВНОЙ, ШРИФТЫ, СЕТКА ИСТОЧНИКОВ 5-в-ряд, ПЛАВНОЕ МЕНЮ, МИГРАЦИЯ КАТЕГОРИЙ КОМПЕНДИУМА. Заход из нескольких сообщений Adam подряд (галерея классов пустая + 2 скриншота, затем на лету — редизайн карточки источника, шрифт заголовка, "5 в ряд"/ссылки, шрифт подзаголовка, резкость меню, миграция категорий):
+  1) БАГ "ГДЕ МОИ КЛАССЫ" (реальная порча данных, не просто UI) — Adam: "в кнопке классов нет моих двух классов а именно варвара и воина... база данных то была". Причина: галерея классов (заход 9) строго фильтрует `classes` по `c.category===currentSourceId`, а поле `cls.category` исторически двойного назначения — раньше это было ручное текстовое поле "📁 Категория" (UI для него убран в заходе 9), и старые/пустые/несовпадающие значения в РЕАЛЬНЫХ данных Adam остались как есть — убрать опасное ручное поле не значит починить уже испорченные данные. Добавлена `healOrphanClassCategories()` — одноразовая самолечащая миграция в `_boot()`: если источник ровно один, все классы с пустым/незнакомым `category` получают `category=sources[0].id` и сохраняются. Намеренно НЕ трогает данные при 2+ источниках (угадать правильный источник нельзя) — для этого случая при появлении второго реального источника потребуется отдельный ручной инструмент. Проверено на симулированных повреждённых данных (`category:''` и `category:'старая-папка'`) — оба класса корректно появляются в галерее после лечения.
+  2) Поиск+сортировка убраны СО СТРАНИЦЫ ГАЛЕРЕИ КЛАССОВ полностью по прямому запросу ("убери этот поиск и сортировку тоже там она ненужна") — не просто скрыты, а вырезаны из разметки #classes-gallery-view (остались только "← Назад" и заголовок). `renderSidebar()` обращается к `#sb-search`/`#sb-sort` через `?.` — их отсутствие безопасно (пустая строка вместо поискового запроса, `sortAlpha` по умолчанию false → порядок добавления).
+  3) РЕДИЗАЙН ГЛАВНОЙ: АККОРДЕОН ВМЕСТО ПЕРЕХОДА НА СТРАНИЦУ ИСТОЧНИКА — Adam: "при нажатии на эти кнопки не переход на другую страницу... а просто здесь же раскрывается плавно". Карточка источника на главной (`.home-source-card`) больше не ведёт на `src/<id>` по клику — вместо этого `toggleSourceCard(id)` переключает класс `.expanded` на самой карточке, раскрывая `.home-source-sections` (CSS-переход по max-height/opacity/margin-top) с 4 кнопками разделов (`.home-section-btn`, `event.stopPropagation()` чтобы не сворачивать карточку) — клик по кнопке раздела ведёт сразу на `src/<id>/classes|maneuvers|styles|reference`, минуя страницу-источник. Статичные `.home-stat-tag` (некликабельные подписи) заменены на настоящие кнопки. Страница `#source-view` (`src/<id>`) осталась в коде рабочей (прямые ссылки на неё не ломаются), но с главной страницы теперь недостижима. ОТВЕТ на вопрос Adam "эти плашки появляются когда я добавляю новый блок?" — да, `SOURCE_SECTIONS` фиксированный список из 4 разделов, `.map()`-ится на КАЖДЫЙ источник автоматически, ничего вручную добавлять не нужно.
+  4) Про встраивание ссылок прямо в карточку источника и отдельную плашку под Discord — Adam сам отметил "погоди надо про ссылки придумать" и решил пока оставить как есть (Discord — общая кнопка на главной, классы — в разделе "Классы"); в этом заходе НЕ реализовано, осталось как открытый вопрос на будущее.
+  5) ШРИФТЫ ГЛАВНОЙ (2 отдельных отзыва Adam): (а) `.home-title` ("Гильдия Путеискателей") — заголовок казался невзрачным, заменён с Cinzel на новый `--font-display: 'Playfair Display', var(--font-head)` (добавлен в Google Fonts `<link>`, проверена поддержка кириллицы) — не Cinzel повторно, т.к. этот шрифт уже раскритикован Adam на `.action-bar-title` в заходе 9. (б) `.home-subtitle` ("Переводы хомбрю-материалов...") — Adam: "шрифт этого серого текста трудно читаем". Причина: курсивный Cormorant Garamond мелким кеглем на тёмном фоне (`--muted`) — тонкие засечки+курсив+низкий контраст. Заменён на обычный `var(--font)` (тот же Calibri/Candara/Segoe UI, что и весь остальной UI-текст), без курсива, цвет `var(--text)` (светлее `--muted`) при opacity:0.82 — элегантность теперь через letter-spacing, а не через плохо читаемый декоративный шрифт.
+  6) СЕТКА ИСТОЧНИКОВ "5 В РЯД" — Adam прислал скриншот с обведёнными пустыми полями по бокам от карточек ("тут вот блоков должно помещаться 5 потом следующие идут вниз"): `.home-body` был зажат в max-width:960px на широком экране, из-за чего `.home-sources-grid` (auto-fill, minmax(260px,1fr)) физически не мог показать больше 3-4 колонок в узкой центральной полосе, а по бокам пустовало место. `.home-body` max-width увеличен до 1500px, карточки сузены до minmax(230px,1fr) — на типичной ширине экрана (проверено на 1280–1600px) даёт ровно 5 колонок, 6-я и далее переносятся на следующую строку. Тот же грид переиспользуется в галерее классов (`.classes-gallery-grid`), поэтому эффект распространяется и туда.
+  7) ПЛАВНОЕ МЕНЮ (Adam: "открытие меню какое-то резкое, а категории открываются плавно, пусть так везде") — причина: `#nav-menu-overlay` и `.modal-overlay` анимировали ТОЛЬКО дочернюю панель (`transform`), а сам оверлей переключался через `display:none↔block/flex` — мгновенный, без перехода, скачок, из-за которого transform-анимация панели не успевала начаться с видимого состояния (тот же класс проблем, что у `.comp-settings-panel`, которая всегда в DOM и поэтому анимируется штатно). Исправлено по единому паттерну "всегда в DOM + opacity/pointer-events вместо display": `#nav-menu-overlay` и `.modal-overlay` теперь `opacity:0;pointer-events:none` в закрытом состоянии, `.open{opacity:1;pointer-events:auto}` — сам оверлей плавно проявляется (0.22–0.28s), плюс `.modal` дополнительно получил `transform:scale(0.96→1)` для лёгкого эффекта появления. Ни один JS не проверял computed display этих элементов — переход безопасен.
+  8) ПЕРЕНОС КАТЕГОРИЙ КОМПЕНДИУМА МЕЖДУ БИБЛИОТЕКАМИ (Черты↔Приёмы) — Adam спросил "как мне теперь мигрировать приёмы из черт?": разделение на 2 библиотеки (заход 9) при миграции старых данных проверяло только `c.id==='maneuver'` (единственная встроенная дефолтная категория), поэтому пользовательские категории вроде "Приём 1-й степени"…"Приём 5-й степени" остались в "Черты". Добавлена кнопка `⇄ Приёмы`/`⇄ Черты` (`.comp-cat-move-btn`, функция `compMoveCatSection(id)`) в каждой строке панели категорий (⚙ компендиума) — с подтверждением, переносит категорию целиком (записи внутри неё сами "следуют" за категорией через `catId`, отдельного поля section у entries нет). Скрыта для гостя тем же CSS-списком, что и остальные owner-only кнопки категорий. Дополнительно, по прямому запросу Adam ("может написать скрипт который возьмёт все категории с именами [...] и мигрирует их в библиотеку приёмов?") — одноразовая массовая функция `migrateManeuverCatsByName(prefix='Приём')`, НЕ висит в UI (это разовая правка старых данных, не постоянная фича), запускается вручную из консоли браузера (F12→Console) командой `migrateManeuverCatsByName()` — переносит все категории с именем, начинающимся на "Приём", одним вызовом.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright): лечение осиротевших категорий классов (галерея показывает обе реальные записи после починки), отсутствие поиска/сортировки в галерее, аккордеон на главной (клик по карточке разворачивает/сворачивает, клик по кнопке раздела не сворачивает карточку и ведёт на нужный hash, шестерёнка-редактирование источника не триггерит toggle), сетка источников — ровно 5 карточек в первом ряду при 6 источниках, 6-я переносится вниз, читаемость подзаголовка (шрифт/цвет/непрозрачность через getComputedStyle), плавность меню и модалки (opacity замерена в середине transition — не 0 и не 1, значит реально анимируется, а не скачет), кнопка переноса категории между библиотеками (категория и её записи корректно исчезают из текущей библиотеки и появляются в другой), массовая миграция по префиксу имени (5 категорий "Приём N-й степени" перенесены, несвязанная категория не тронута). Ошибок в консоли не найдено ни в одном сценарии.
 2026-09-07 (10) — Adam прислал скриншот мобильного топбара с вопросом "зачем в мобильной версии эти кнопки?" (обведены книга-компендиум и шестерёнка-настройки рядом с гамбургером) + явно: "кнопку компендиум на топбаре тоже вырежи не нужна у нас теперь не компендиум а библиотеки". Обе кнопки (#mob-comp-btn, #mob-settings-btn) убраны из #mob-topbar — они были чистой избыточностью: #mob-settings-btn дублировал #settings-btn в action-bar (тот же onclick=toggleSettingsPanel(), виден на мобильном и так, action-bar на мобилке не прячется целиком — прячется только .action-bar-title), а #mob-comp-btn был точечным быстрым переходом в "компендиум" без привязки к источнику/библиотеке — концептуально не имеет смысла теперь, когда компендиум это две раздельные именованные библиотеки (Черты/Приёмы), доступные как обычные пункты "☰ Меню", а не единая сущность с одной кнопкой-ярлыком. Мёртвое CSS-правило `body.comp-mode #mob-comp-btn,body.comp-mode #mob-settings-btn{display:none!important;}` тоже убрано. Мобильный топбар теперь: гамбургер + название класса, ничего больше — вся навигация (разделы, настройки, компендиум/библиотеки) идёт через "☰ Меню"/действия внутри страницы, как на десктопе.
 2026-09-07 (9) — ГАЛЕРЕЯ КЛАССОВ, РАЗДЕЛЕНИЕ БИБЛИОТЕК (Черты/Приёмы), ПРАВКИ ШАПКИ КЛАСС-БИЛДЕРА, ФИКСЫ РЕДАКТОРА. Большой заход по прямому запросу Adam (2 аннотированных скриншота шапки класс-билдера + серия отдельных сообщений с новыми скриншотами по ходу работы):
   1) ГАЛЕРЕЯ КЛАССОВ (новая страница) — Adam: "кнопка классы тоже не нужна в библиотеке, когда я нажимаю на классы меня должно бросать на отдельную страницу с блоками которые и есть классы, который нажав только переходишь на класс" + позже подтвердил скриншотом, что старый список классов внутри "Меню" тоже не нужен ("вот тут эти моменты не нужны я уже говорил что мы будем делать"). Реализовано: клик "Классы" теперь ведёт на `src/<id>/classes` — новый экран #classes-gallery-view с карточками классов (имя+описание, ✕ удаления у owner, "+Добавить класс"), клик по карточке → `src/<id>/classes/<classId>` открывает класс-билдер как раньше (с "☰ Меню"). Поиск/сортировка (те же id sb-search/sb-sort, тот же код) переехали на саму страницу галереи. Блок #nav-menu-classes-block (поиск+сортировка+список+"+Добавить класс" внутри оверлея "Меню") ПОЛНОСТЬЮ УДАЛЁН — сначала думал оставить, но Adam явно указал, что это тоже лишнее теперь. renderSidebar()/renderClassItem() переписаны в renderClassCard()+openClassCard() — та же логика фильтрации по currentSourceId, но рендерят карточки в #classes-gallery-grid вместо списка в #class-list (которого больше нет — cat-folder/drag-между-категориями код (toggleCat/renameCatInline/initSidebarDrag) оставлен мёртвым, безопасно no-op'ится через null-проверки). Легаси-хэш `#classes` теперь редиректит на галерею первого источника вместо старого плоского списка с папками. addClassPrompt()/modalOk('class') и deleteClass() обновлены под новый флоу (после создания — сразу переход в билдер нового класса через hash).
@@ -101,9 +116,9 @@ CHANGELOG (новое сверху):
 <meta name="generator" content="Гильдия Путеискателей — оригинальный инструмент Master Oogway">
 <title>Гильдия Путеискателей</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='10' fill='%23141a15'/><circle cx='32' cy='32' r='27' stroke='%239e7c32' stroke-opacity='.6' stroke-width='2'/><path d='M32 8L36 24L32 20L28 24Z' fill='%239e7c32'/><path d='M32 56L28 40L32 44L36 40Z' fill='%239e7c32' fill-opacity='.6'/><path d='M56 32L40 28L44 32L40 36Z' fill='%239e7c32' fill-opacity='.6'/><path d='M8 32L24 36L20 32L24 28Z' fill='%239e7c32' fill-opacity='.6'/><circle cx='32' cy='32' r='5' fill='%234e7a5c'/><circle cx='32' cy='32' r='2.5' fill='%23c49848'/></svg>">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Playfair+Display:wght@600;700;800&display=swap">
 <style>
-:root{--bg:#141a15;--sidebar-bg:#182019;--panel:#1c2620;--panel2:#223028;--border:#2c3d30;--gold:#9e7c32;--gold2:#c49848;--text:#ded4b8;--muted:#a89e82;--accent:#4e7a5c;--sub:#8a6a3a;--font:'Calibri','Candara','Segoe UI',Arial,sans-serif;--font-head:'Cinzel',var(--font);--font-body:'Cormorant Garamond',Georgia,serif;--ui-fs:13px;--table-fs:0.85em;--radius:6px;--radius-sm:4px;--radius-pill:20px;}
+:root{--bg:#141a15;--sidebar-bg:#182019;--panel:#1c2620;--panel2:#223028;--border:#2c3d30;--gold:#9e7c32;--gold2:#c49848;--text:#ded4b8;--muted:#a89e82;--accent:#4e7a5c;--sub:#8a6a3a;--font:'Calibri','Candara','Segoe UI',Arial,sans-serif;--font-head:'Cinzel',var(--font);--font-body:'Cormorant Garamond',Georgia,serif;--font-display:'Playfair Display',var(--font-head);--ui-fs:13px;--table-fs:0.85em;--radius:6px;--radius-sm:4px;--radius-pill:20px;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;font-size:var(--ui-fs);overflow-x:hidden;}
 
@@ -390,9 +405,10 @@ input[type=color].cls-accent-dot::-webkit-color-swatch{border:none;border-radius
 .color-input-overlay{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none;padding:0;}
 
 /* MODAL */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;align-items:center;justify-content:center;}
-.modal-overlay.open{display:flex;}
-.modal{background:var(--panel2);border:1px solid var(--gold);padding:24px;width:340px;max-width:90vw;border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,0.6);}
+.modal-overlay{display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .22s ease;}
+.modal-overlay.open{opacity:1;pointer-events:auto;}
+.modal{background:var(--panel2);border:1px solid var(--gold);padding:24px;width:340px;max-width:90vw;border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,0.6);transform:scale(0.96);transition:transform .22s ease;}
+.modal-overlay.open .modal{transform:scale(1);}
 .modal-title{font-size:1em;color:var(--gold);letter-spacing:2px;margin-bottom:14px;font-weight:700;}
 .modal-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 11px;font-size:1em;outline:none;margin-bottom:10px;font-family:var(--font);border-radius:var(--radius-sm);}
 .modal-input:focus{border-color:var(--gold);}
@@ -595,7 +611,12 @@ body.comp-mode #screen-compendium{display:flex!important;}
 .comp-sp-close{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:1.1em;line-height:1;transition:color .15s;}
 .comp-sp-close:hover{color:var(--gold);}
 .comp-cat-list{flex:1;overflow-y:auto;padding:8px;}
-.comp-cat-item{display:flex;align-items:center;gap:5px;padding:5px 7px;background:var(--panel);border:1px solid var(--border);margin-bottom:3px;cursor:grab;}
+.comp-cat-item{display:flex;flex-direction:column;gap:4px;padding:5px 7px;background:var(--panel);border:1px solid var(--border);margin-bottom:3px;cursor:grab;}
+.comp-cat-row1{display:flex;align-items:center;gap:5px;}
+.comp-cat-row2{display:flex;align-items:center;gap:5px;padding-left:19px;}
+.comp-cat-img-inp{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:3px 6px;font-size:0.72em;outline:none;font-family:var(--font);}
+.comp-cat-img-inp:focus{border-color:var(--gold);}
+.comp-cat-img-preview{width:18px;height:18px;object-fit:contain;flex-shrink:0;border-radius:2px;background:var(--panel2);}
 .comp-cat-item:hover{border-color:var(--border);}
 .comp-cat-item.drag-over{background:rgba(158,124,50,0.1);border-color:rgba(158,124,50,0.4);}
 .comp-cat-drag-h{color:var(--muted);font-size:0.82em;cursor:grab;flex-shrink:0;}
@@ -604,6 +625,8 @@ body.comp-mode #screen-compendium{display:flex!important;}
 .comp-cat-name-inp:focus,.comp-cat-icon-inp:focus{border-color:var(--gold);}
 .comp-cat-del-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:0.85em;flex-shrink:0;transition:color .15s;}
 .comp-cat-del-btn:hover{color:#c04444;}
+.comp-cat-move-btn{background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);cursor:pointer;font-size:0.68em;flex-shrink:0;padding:3px 6px;white-space:nowrap;font-family:var(--font);transition:all .15s;}
+.comp-cat-move-btn:hover{color:var(--gold2);border-color:var(--gold);}
 .comp-add-cat-btn{margin:8px;padding:8px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.78em;text-align:center;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .comp-add-cat-btn:hover{border-color:var(--gold);color:var(--gold);}
 
@@ -642,8 +665,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 0%,rgba(78,122,92,0.12),transparent 70%);pointer-events:none;}
 .home-emblem{width:64px;height:64px;opacity:0.9;margin-bottom:14px;}
 .home-emblem svg{width:100%;height:100%;}
-.home-title{font-family:var(--font-head);font-size:2em;font-weight:700;color:var(--gold2);letter-spacing:0.05em;line-height:1.15;text-wrap:balance;margin-bottom:8px;}
-.home-subtitle{font-family:var(--font-body);font-size:1.15em;font-style:italic;color:var(--muted);margin-bottom:18px;}
+.home-title{font-family:var(--font-display);font-size:2.1em;font-weight:700;color:var(--gold2);letter-spacing:0.02em;line-height:1.15;text-wrap:balance;margin-bottom:8px;}
+.home-subtitle{font-family:var(--font);font-size:1.05em;font-style:normal;font-weight:400;color:var(--text);opacity:0.82;letter-spacing:0.02em;margin-bottom:18px;}
 .home-badge{display:inline-flex;align-items:center;gap:6px;font-size:0.7em;font-family:var(--font);letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);background:rgba(158,124,50,0.12);border:1px solid rgba(158,124,50,0.3);border-radius:var(--radius-pill);padding:4px 14px;}
 /* Доп. кнопки-ссылки на главной (Discord и любые другие внешние ссылки, admin-addable — см. homeLinks/renderHomeLinks) */
 .home-links-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px;}
@@ -655,10 +678,10 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-link-del:hover{color:#c06060;opacity:1;}
 .home-link-add-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:transparent;border:1px dashed var(--border);border-radius:var(--radius-pill);color:var(--muted);font-size:0.85em;cursor:pointer;font-family:var(--font);transition:all .15s;}
 .home-link-add-btn:hover{border-color:var(--gold);color:var(--gold);}
-.home-body{max-width:960px;margin:0 auto;padding:0 28px 80px;}
+.home-body{max-width:1500px;margin:0 auto;padding:0 28px 80px;}
 .home-section-label{font-family:var(--font-head);font-size:0.72em;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:12px;margin-bottom:18px;}
 .home-section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(158,124,50,0.3),transparent);}
-.home-sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+.home-sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;}
 .home-source-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:22px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
 .home-source-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--gold),var(--accent));opacity:0;transition:opacity .2s;}
 .home-source-card:hover{border-color:var(--accent);background:var(--panel2);}
@@ -667,6 +690,10 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-source-desc{font-family:var(--font-body);font-size:1em;color:var(--muted);line-height:1.5;margin-bottom:14px;}
 .home-source-stats{display:flex;gap:8px;flex-wrap:wrap;}
 .home-stat-tag{font-size:0.72em;font-family:var(--font);color:var(--accent);background:rgba(78,122,92,0.12);border:1px solid rgba(78,122,92,0.3);border-radius:var(--radius-sm);padding:2px 9px;letter-spacing:0.03em;}
+.home-source-sections{display:flex;flex-wrap:wrap;gap:8px;max-height:0;opacity:0;overflow:hidden;transition:max-height .32s ease,opacity .22s ease,margin-top .32s ease;margin-top:0;}
+.home-source-card.expanded .home-source-sections{max-height:200px;opacity:1;margin-top:14px;}
+.home-section-btn{font-size:0.78em;font-family:var(--font);color:var(--accent);background:rgba(78,122,92,0.1);border:1px solid rgba(78,122,92,0.32);border-radius:var(--radius-sm);padding:6px 13px;letter-spacing:0.02em;cursor:pointer;transition:all .15s;}
+.home-section-btn:hover{border-color:var(--accent);background:rgba(78,122,92,0.22);color:var(--gold2);}
 .home-source-card.soon{opacity:0.45;cursor:default;border-style:dashed;}
 .home-source-card.soon:hover{background:var(--panel);border-color:var(--border);}
 .home-source-card.soon:hover::before{opacity:0;}
@@ -680,6 +707,15 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-source-card.add-source-card:hover .home-source-name{color:var(--gold2);}
 .class-gallery-del{position:absolute;top:8px;right:10px;font-size:0.78em;color:var(--muted);opacity:0.5;cursor:pointer;line-height:1;transition:all .15s;z-index:2;}
 .class-gallery-del:hover{opacity:1;color:#c06060;}
+.class-gallery-edit-btn{position:absolute;top:8px;right:28px;color:var(--muted);opacity:0.5;transition:opacity .15s,color .15s;z-index:2;}
+.class-gallery-edit-btn:hover{opacity:1;color:var(--gold);}
+/* Пользовательские картинки-логотипы (источники/классы/категории компендиума) — приглушённые,
+   чтобы яркие сторонние картинки (например цветной значок laserllama) не выбивались из общей
+   тёмной нефритово-золотой палитры сайта. Заход 12, Adam: "такую приглушённую картинку чтобы
+   не выделялась сильно... типа фильтра поверх картинки". */
+.site-badge-img{filter:grayscale(35%) saturate(0.7) brightness(0.82) contrast(1.05);opacity:0.88;transition:filter .2s,opacity .2s;}
+.home-source-card:hover .site-badge-img{filter:grayscale(15%) saturate(0.85) brightness(0.92) contrast(1.02);opacity:1;}
+.home-source-badge{width:40px;height:40px;object-fit:contain;border-radius:6px;margin-bottom:10px;display:block;}
 
 /* ═══ СТРАНИЦА ИСТОЧНИКА (Источник→Раздел) ═══ */
 #source-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
@@ -699,9 +735,9 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 /* ═══ НАВИГАЦИОННОЕ МЕНЮ (оверлей, не влияет на разметку страницы) ═══ */
 .nav-menu-btn{background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;padding:4px 9px;font-family:var(--font);border-radius:var(--radius-sm);transition:all .15s;display:inline-flex;align-items:center;gap:6px;}
 .nav-menu-btn:hover{border-color:var(--gold);color:var(--gold2);}
-.nav-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;display:none;}
-.nav-menu-overlay.open{display:block;}
-.nav-menu-panel{position:fixed;top:0;left:0;bottom:0;width:270px;max-width:85vw;background:var(--sidebar-bg);border-right:1px solid var(--border);box-shadow:4px 0 24px rgba(0,0,0,0.6);transform:translateX(-100%);transition:transform .2s;display:flex;flex-direction:column;padding:16px 0;overflow-y:auto;}
+.nav-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;opacity:0;pointer-events:none;transition:opacity .28s ease;}
+.nav-menu-overlay.open{opacity:1;pointer-events:auto;}
+.nav-menu-panel{position:fixed;top:0;left:0;bottom:0;width:270px;max-width:85vw;background:var(--sidebar-bg);border-right:1px solid var(--border);box-shadow:4px 0 24px rgba(0,0,0,0.6);transform:translateX(-100%);transition:transform .28s ease;display:flex;flex-direction:column;padding:16px 0;overflow-y:auto;}
 .nav-menu-overlay.open .nav-menu-panel{transform:translateX(0);}
 .nav-menu-title{font-family:var(--font-head);font-size:0.7em;letter-spacing:2px;text-transform:uppercase;color:var(--gold2);opacity:0.8;padding:4px 18px 12px;}
 .nav-menu-item{display:flex;align-items:center;gap:10px;padding:10px 18px;color:var(--text);cursor:pointer;font-family:var(--font);font-size:0.92em;border-left:2px solid transparent;transition:all .15s;}
@@ -772,11 +808,6 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
   <div class="source-hero">
     <button class="source-home-link" id="gallery-back-btn">← Назад</button>
     <h1 class="source-title" id="gallery-title">Классы</h1>
-    <div class="sidebar-search" style="position:relative;max-width:280px;margin:0 auto 10px;">
-      <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;display:flex;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg></span>
-      <input class="sb-search-inp" id="sb-search" style="padding-left:26px;" placeholder="Поиск..." oninput="renderSidebar()">
-    </div>
-    <button class="sb-sort-btn" id="sb-sort" onclick="toggleSort()" style="max-width:150px;margin:0 auto;">A–Z Сортировка</button>
   </div>
   <div class="home-sources-grid classes-gallery-grid" id="classes-gallery-grid"></div>
   <div class="home-footer">© Master Oogway · Гильдия Путеискателей</div>
@@ -838,6 +869,7 @@ if (location.hash === '#classes' || /^#src\/[^/]+\/classes$/.test(location.hash)
     <div class="modal-title" id="modal-title">Новый класс</div>
     <input class="modal-input" id="modal-inp1" placeholder="Название...">
     <input class="modal-input" id="modal-inp2" placeholder="Описание (необязательно)">
+    <input class="modal-input" id="modal-inp3" placeholder="Путь к картинке (необязательно)">
     <div class="modal-btns">
       <button class="btn" onclick="closeModal()">Отмена</button>
       <button class="btn btn-g" id="modal-ok" onclick="modalOk()">Создать</button>
@@ -929,7 +961,7 @@ const SLOT_DATA={
 /* STATE */
 let classes=[], activeId=null, dragSrc=null, activeSubId=null, modalMode='class';
 /* ИСТОЧНИКИ (новая навигация Источник→Раздел) */
-let sources=[], currentSourceId=null, editingSourceId=null;
+let sources=[], currentSourceId=null, editingSourceId=null, editingClassId=null;
 const SOURCE_SECTIONS=[
   {id:'classes', label:'Классы'},
   {id:'maneuvers', label:'Приёмы'},
@@ -1014,6 +1046,22 @@ function save(){
   db.collection('data').doc('classes').set({list: classes}).catch(e => console.error('save failed:', e));
 }
 function getActive(){ return classes.find(c=>c.id===activeId)||null; }
+
+/* Самоисцеление: класс без category (или с category, не совпадающим ни с одним реальным источником —
+   например остаток от старого ручного текстового поля "📁 Категория...", убранного в заходе 9) станет
+   невидим в галерее классов, т.к. галерея строго фильтрует по cls.category===currentSourceId. Пока
+   источник ровно один — однозначно чиним, привязывая такие классы к нему. Вызывается один раз при
+   загрузке (см. _boot()), до первого рендера. См. заход 11 — у Adam пропали 2 класса после перехода
+   на галерею именно по этой причине. */
+function healOrphanClassCategories(){
+  if (sources.length !== 1) return; // при 2+ источниках угадывать нельзя — оставляем как есть
+  const sid = sources[0].id;
+  let healed = false;
+  classes.forEach(c => {
+    if (!c.category || !sources.some(s => s.id === c.category)) { c.category = sid; healed = true; }
+  });
+  if (healed) save();
+}
 
 /* SCALE & FONT SIZE */
 let uiFontSize=13;
@@ -1425,7 +1473,7 @@ function applyROMode() {
     '.tpl-section{display:none!important;}' +
     /* compendium */
     '.comp-toggle-drag-btn,.comp-drag-btn,.comp-edit-btn{display:none!important;}' +
-    '.comp-add-btn,.comp-settings-btn,.comp-export-btn,.comp-add-cat-btn,.comp-cat-del-btn,.comp-cat-drag-h{display:none!important;}' +
+    '.comp-add-btn,.comp-settings-btn,.comp-export-btn,.comp-add-cat-btn,.comp-cat-del-btn,.comp-cat-move-btn,.comp-cat-drag-h{display:none!important;}' +
     /* remaining inputs/textareas */
     'input:not(.comp-search-inp):not(.comp-filter-inp),textarea,select:not(.comp-filter-sel){pointer-events:none!important;cursor:default!important;}' +
     '.comp-search-inp,.comp-filter-inp,.comp-filter-sel{pointer-events:auto!important;}';
@@ -1463,7 +1511,9 @@ function syncFeatures(cls){
 /* CLASSES GALLERY RENDER (заменяет собой бывший постоянный сайдбар и список в меню — см. renderClassesGallery ниже) */
 function renderClassCard(c){
   return `<div class="home-source-card class-gallery-card" data-cls-id="${c.id}" onclick="openClassCard(${c.id})">
+    ${isOwner?`<span class="class-gallery-edit-btn" onclick="event.stopPropagation();editClassPrompt(${c.id})" title="Редактировать класс">${ICO.gear}</span>`:''}
     ${isOwner?`<span class="class-gallery-del" onclick="event.stopPropagation();deleteClass(${c.id})" title="Удалить класс">✕</span>`:''}
+    ${c.img?`<img class="home-source-badge site-badge-img" src="${esc(c.img)}" alt="">`:''}
     <div class="home-source-name">${esc(c.name)}</div>
     ${c.desc?`<div class="home-source-desc">${esc(c.desc)}</div>`:''}
   </div>`;
@@ -1572,27 +1622,47 @@ function deleteClass(id){
 }
 
 /* MODALS */
-function openModal(title,p1,p2,okLabel,mode){
+function openModal(title,p1,p2,okLabel,mode,p3){
   modalMode=mode;
   document.getElementById('modal-title').textContent=title;
-  const i1=document.getElementById('modal-inp1'),i2=document.getElementById('modal-inp2');
-  i1.value='';i2.value='';i1.placeholder=p1;i2.placeholder=p2;
+  const i1=document.getElementById('modal-inp1'),i2=document.getElementById('modal-inp2'),i3=document.getElementById('modal-inp3');
+  i1.value='';i2.value='';i3.value='';i1.placeholder=p1;i2.placeholder=p2;i3.placeholder=p3||'';
   i2.style.display=p2?'':'none';
+  i3.style.display=p3?'':'none';
   document.getElementById('modal').classList.add('open');
   document.getElementById('modal-ok').textContent=okLabel;
   setTimeout(()=>i1.focus(),50);
 }
-function addClassPrompt(){ openModal('Новый класс','Название...','Описание (необязательно)','Создать','class'); }
+function addClassPrompt(){ editingClassId=null; openModal('Новый класс','Название...','Описание (необязательно)','Создать','class','Путь к картинке (необязательно)'); }
+// Заход 12: редактирование картинки (и заодно названия/описания) уже СУЩЕСТВУЮЩЕГО класса прямо
+// из карточки в галерее — раньше такой возможности не было вообще (переименовать можно было только
+// зайдя внутрь билдера). Тот же модал, что и создание, просто editingClassId!=null → modalOk() не
+// создаёт новый класс, а патчит существующий.
+function editClassPrompt(id){
+  const c=classes.find(x=>x.id===id); if(!c) return;
+  editingClassId=id;
+  openModal('Редактировать класс','Название...','Описание (необязательно)','Сохранить','class','Путь к картинке (необязательно)');
+  document.getElementById('modal-inp1').value=c.name;
+  document.getElementById('modal-inp2').value=c.desc||'';
+  document.getElementById('modal-inp3').value=c.img||'';
+}
 function addSubPrompt(){ openModal('Новый подкласс','Название подкласса...','','Добавить','sub'); }
 function addColPrompt(){ openModal('Новый столбец','Название столбца...','','Добавить','col'); }
 function closeModal(){ document.getElementById('modal').classList.remove('open'); }
 function modalOk(){
   const v1=document.getElementById('modal-inp1').value.trim();
   const v2=document.getElementById('modal-inp2').value.trim();
+  const v3=document.getElementById('modal-inp3').value.trim();
   if(!v1)return;
   if(modalMode==='class'){
+    if(editingClassId){
+      const c=classes.find(x=>x.id===editingClassId);
+      if(c){ c.name=v1; c.desc=v2||''; c.img=v3||''; }
+      editingClassId=null; closeModal(); save(); renderSidebar();
+      return;
+    }
     const nc=JSON.parse(JSON.stringify(DEFAULT));
-    nc.id=Date.now(); nc.name=v1; nc.desc=v2||'';
+    nc.id=Date.now(); nc.name=v1; nc.desc=v2||''; nc.img=v3||'';
     if(currentSourceId) nc.category=currentSourceId;
     classes.push(nc); closeModal(); save();
     if(currentSourceId) location.hash='src/'+encodeURIComponent(currentSourceId)+'/classes/'+nc.id;
@@ -1600,11 +1670,11 @@ function modalOk(){
   } else if(modalMode==='source'){
     if(editingSourceId){
       const s=sources.find(x=>x.id===editingSourceId);
-      if(s){ s.name=v1; s.desc=v2||''; }
+      if(s){ s.name=v1; s.desc=v2||''; s.img=v3||''; }
     } else {
       let id=slugify(v1), n=1;
       while(sources.some(s=>s.id===id)){ id=slugify(v1)+'-'+(++n); }
-      sources.push({id, name:v1, desc:v2||''});
+      sources.push({id, name:v1, desc:v2||'', img:v3||''});
     }
     editingSourceId=null; closeModal(); saveSources(); renderHome();
   } else if(modalMode==='homelink'){
@@ -2744,13 +2814,14 @@ function saveSources() {
   db.collection('data').doc('sources').set({ list: JSON.parse(JSON.stringify(sources)) }).catch(e => console.error('saveSources failed:', e));
 }
 function slugify(s){ return String(s||'').toLowerCase().trim().replace(/[^a-zа-я0-9]+/gi,'-').replace(/^-+|-+$/g,'') || ('src'+Date.now()); }
-function addSourcePrompt(){ editingSourceId=null; openModal('Новый источник','Название источника...','Краткое описание...','Создать','source'); }
+function addSourcePrompt(){ editingSourceId=null; openModal('Новый источник','Название источника...','Краткое описание...','Создать','source','Путь к картинке-логотипу (необязательно)'); }
 function editSourcePrompt(id){
   const s=sources.find(x=>x.id===id); if(!s) return;
   editingSourceId=id;
-  openModal('Редактировать источник','Название источника...','Краткое описание...','Сохранить','source');
+  openModal('Редактировать источник','Название источника...','Краткое описание...','Сохранить','source','Путь к картинке-логотипу (необязательно)');
   document.getElementById('modal-inp1').value=s.name;
   document.getElementById('modal-inp2').value=s.desc||'';
+  document.getElementById('modal-inp3').value=s.img||'';
 }
 function deleteSource(id){
   if(!confirm('Удалить источник? Классы внутри него останутся, но пропадут из навигации по источнику.')) return;
@@ -2922,7 +2993,7 @@ function renderCompByType(el, entries) {
     const colsHtml = compSplitColumns(cEntries.map(e => compEntryHtml(e, cat)));
     const zoneHtml = compDragMode ? `<div class="comp-drop-zone" data-cat-id="${esc(cat.id)}">⬇ Перетащи сюда</div>` : (!cEntries.length ? `<div class="comp-empty-zone">—</div>` : '');
     html += `<div class="comp-group">
-      <div class="comp-group-label" style="color:${cat.color};border-bottom-color:${cat.color}"><span class="cgl-icon">${esc(cat.icon)}</span>${esc(cat.name)}</div>
+      <div class="comp-group-label" style="color:${cat.color};border-bottom-color:${cat.color}"><span class="cgl-icon">${compCatIconHtml(cat, 1.1)}</span>${esc(cat.name)}</div>
       <div class="comp-group-entries" id="cgrp-${esc(cat.id)}">${colsHtml}</div>
       ${zoneHtml}
     </div>`;
@@ -2965,10 +3036,20 @@ function renderCompByLevel(el, entries) {
   el.innerHTML = html || `<div style="padding:40px;text-align:center;color:var(--muted)">Ничего не найдено</div>`;
 }
 
+// Иконка категории — своя картинка (cat.iconImg, путь/URL, загружает сам Adam в свой репозиторий
+// рядом с index.html при обычном деплое) ИЛИ эмодзи/текст (cat.icon), если картинка не задана.
+// Единая точка рендера, чтобы не дублировать этот if/else в 4 местах (группы, карточки записей,
+// шапка детального вида) — см. заход 12.
+function compCatIconHtml(cat, sizeEm) {
+  sizeEm = sizeEm || 1;
+  if (cat && cat.iconImg) return `<img class="site-badge-img" src="${esc(cat.iconImg)}" alt="" style="width:${sizeEm}em;height:${sizeEm}em;object-fit:contain;vertical-align:-0.15em;">`;
+  return esc((cat && cat.icon) || '?');
+}
+
 /* ---------- ENTRY HTML ---------- */
 function compEntryHtml(e, cat) {
   return `<div class="comp-entry" data-entry-id="${e.id}" onclick="compOpenEntry(${e.id})" draggable="${compDragMode?'true':'false'}">
-    <span class="comp-entry-icon" style="color:${cat.color||'var(--muted)'}">${esc(cat.icon||'?')}</span>
+    <span class="comp-entry-icon" style="color:${cat.color||'var(--muted)'}">${compCatIconHtml(cat)}</span>
     <span class="comp-entry-name">${esc(e.name||'—')}${e.nameEn?` <span style="color:var(--muted);font-size:0.8em">[${esc(e.nameEn)}]</span>`:''}</span>
     ${e.level!=null?`<span class="comp-entry-lvl">${esc(String(e.level))}</span>`:''}
   </div>`;
@@ -3012,7 +3093,7 @@ function renderCompDetail(id) {
             ${e.nameEn?`<div class="comp-view-nameen">${esc(e.nameEn)}</div>`:''}
           </div>
         </div>
-        <div class="comp-view-cat" style="color:${cat.color}">${esc(cat.icon)} ${esc(cat.name)}${e.source?` <span style="color:var(--muted);font-weight:400;margin-left:8px;font-size:0.9em">${esc(e.source)}</span>`:''}</div>
+        <div class="comp-view-cat" style="color:${cat.color}">${compCatIconHtml(cat, 1.05)} ${esc(cat.name)}${e.source?` <span style="color:var(--muted);font-weight:400;margin-left:8px;font-size:0.9em">${esc(e.source)}</span>`:''}</div>
         ${metaHtml}
       </div>
       <div class="comp-detail-body-wrap">
@@ -3170,17 +3251,57 @@ function renderCompSettingsPanel() {
     <div class="comp-cat-list" id="comp-cat-list">
       ${cats.map(c => `
         <div class="comp-cat-item" data-cat-id="${esc(c.id)}" draggable="true">
-          <span class="comp-cat-drag-h">⠿</span>
-          <input class="comp-cat-icon-inp" value="${esc(c.icon||'')}" maxlength="2" title="Иконка" oninput="compUpdCat('${esc(c.id)}','icon',this.value)">
-          <input class="comp-cat-name-inp" value="${esc(c.name||'')}" oninput="compUpdCat('${esc(c.id)}','name',this.value)">
-          <input type="color" value="${c.color||'#888888'}" onchange="compUpdCat('${esc(c.id)}','color',this.value)" style="width:22px;height:22px;border:none;cursor:pointer;background:none;padding:0;flex-shrink:0;">
-          <button class="comp-cat-del-btn" onclick="compDeleteCat('${esc(c.id)}')">✕</button>
+          <div class="comp-cat-row1">
+            <span class="comp-cat-drag-h">⠿</span>
+            <input class="comp-cat-icon-inp" value="${esc(c.icon||'')}" maxlength="2" title="Эмодзи/буквы (если картинка не задана)" oninput="compUpdCat('${esc(c.id)}','icon',this.value)">
+            <input class="comp-cat-name-inp" value="${esc(c.name||'')}" oninput="compUpdCat('${esc(c.id)}','name',this.value)">
+            <input type="color" value="${c.color||'#888888'}" onchange="compUpdCat('${esc(c.id)}','color',this.value)" style="width:22px;height:22px;border:none;cursor:pointer;background:none;padding:0;flex-shrink:0;">
+            <button class="comp-cat-del-btn" onclick="compDeleteCat('${esc(c.id)}')">✕</button>
+          </div>
+          <div class="comp-cat-row2">
+            ${c.iconImg ? `<img class="comp-cat-img-preview" src="${esc(c.iconImg)}" alt="">` : ''}
+            <input class="comp-cat-img-inp" value="${esc(c.iconImg||'')}" placeholder="путь к картинке, напр. icons/combat.png" title="Путь/URL своей картинки-иконки — если задано, заменяет эмодзи" oninput="compUpdCat('${esc(c.id)}','iconImg',this.value)">
+            <button class="comp-cat-move-btn" onclick="compMoveCatSection('${esc(c.id)}')" title="Перенести в «${esc(COMP_SECTION_LABELS[(c.section==='maneuvers')?'traits':'maneuvers'])}»">⇄ ${esc(COMP_SECTION_LABELS[(c.section==='maneuvers')?'traits':'maneuvers'])}</button>
+          </div>
         </div>
       `).join('')}
     </div>
     <button class="comp-add-cat-btn" onclick="compAddCat()">+ Добавить категорию</button>
   `;
   initCompCatDrag();
+}
+
+// Перенос категории (со всеми её записями) между библиотеками Черты↔Приёмы — отвечает на вопрос
+// Adam "как мигрировать приёмы из черт": категория целиком меняет section, entries внутри неё
+// (COMP.entries[].catId===id) сами по себе никуда не переезжают физически — они просто "следуют"
+// за категорией, т.к. фильтруются по catId→section через compCatsInSection(), отдельного поля
+// section у entries нет и не нужно.
+function compMoveCatSection(id) {
+  const c = COMP.categories.find(x => x.id === id); if (!c) return;
+  const newSection = (c.section === 'maneuvers') ? 'traits' : 'maneuvers';
+  const cnt = COMP.entries.filter(e => e.catId === id).length;
+  if (!confirm(`Перенести категорию «${c.name}»${cnt?` (${cnt} записей)`:''} в библиотеку «${COMP_SECTION_LABELS[newSection]}»?`)) return;
+  c.section = newSection;
+  saveComp();
+  renderCompSettingsPanel(); renderCompTopbar(); renderCompLegend(); renderCompBody();
+}
+
+// Разовая массовая миграция категорий "Приём N-й степени" (и подобных) из "Черты" в "Приёмы" —
+// Adam спросил "может написать скрипт который возьмёт все категории с именами [...] и мигрирует
+// их в библиотеку приёмов?" вместо того чтобы жать кнопку "⇄ Приёмы" по одной штуке. НЕ вызывается
+// из UI (это одноразовая правка старых данных, не постоянная фича) — запускается вручную из
+// консоли браузера (F12 → Console): migrateManeuverCatsByName()
+// По умолчанию ищет категории, чьё название начинается с "Приём"; можно передать другой префикс,
+// например migrateManeuverCatsByName('Заклинание') для другого набора старых категорий.
+function migrateManeuverCatsByName(prefix) {
+  prefix = prefix || 'Приём';
+  const moved = COMP.categories.filter(c => (c.name||'').trim().startsWith(prefix) && c.section !== 'maneuvers');
+  if (!moved.length) { console.log('Ничего не найдено по префиксу «' + prefix + '» (или уже в библиотеке "Приёмы").'); return; }
+  moved.forEach(c => { c.section = 'maneuvers'; });
+  saveComp();
+  renderCompTopbar(); renderCompLegend(); renderCompBody();
+  if (document.getElementById('comp-settings-panel').classList.contains('open')) renderCompSettingsPanel();
+  console.log('Перенесено в "Приёмы" (' + moved.length + '): ' + moved.map(c=>c.name).join(', '));
 }
 
 function compUpdCat(id, field, value) {
@@ -3237,17 +3358,29 @@ function renderHome(){
   const grid=document.getElementById('home-sources-grid');
   if(!grid || !sources.length) return; // данные ещё не загрузились — статичный фолбэк из HTML остаётся как есть
   let html = sources.map(s=>`
-    <div class="home-source-card" onclick="location.hash='src/${esc(s.id)}'">
+    <div class="home-source-card" data-src-id="${esc(s.id)}" onclick="toggleSourceCard('${esc(s.id)}')">
       ${isOwner?`<span class="home-source-edit-btn" onclick="event.stopPropagation();editSourcePrompt('${esc(s.id)}')" title="Редактировать источник">${ICO.gear}</span>`:''}
+      ${s.img?`<img class="home-source-badge site-badge-img" src="${esc(s.img)}" alt="">`:''}
       <div class="home-source-name">${esc(s.name)}</div>
       <div class="home-source-desc">${esc(s.desc||'')}</div>
-      <div class="home-source-stats">${SOURCE_SECTIONS.map(sec=>`<span class="home-stat-tag">${esc(sec.label)}</span>`).join('')}</div>
+      <div class="home-source-sections" id="home-src-sections-${esc(s.id)}">
+        ${SOURCE_SECTIONS.map(sec=>`<div class="home-section-btn" onclick="event.stopPropagation();location.hash='src/${esc(s.id)}/${sec.id}'">${esc(sec.label)}</div>`).join('')}
+      </div>
     </div>`).join('');
   html += isOwner
     ? `<div class="home-source-card add-source-card" onclick="addSourcePrompt()"><div class="home-source-name">+ Добавить источник</div></div>`
     : `<div class="home-source-card soon"><div class="home-source-name">Новый источник</div><div class="home-source-desc">Здесь появится следующий переведённый автор</div><div class="home-soon-label">Скоро</div></div>`;
   grid.innerHTML = html;
   renderHomeLinks();
+}
+
+/* Клик по карточке источника на главной больше не уводит на отдельную страницу (#source-view) —
+   вместо этого карточка плавно разворачивается на месте и показывает кнопки разделов
+   (см. заход 11, Adam: "не переход на другую страницу... а просто здесь же раскрывается плавно"). */
+function toggleSourceCard(id){
+  const card = document.querySelector(`.home-source-card[data-src-id="${CSS.escape(id)}"]`);
+  if(!card) return;
+  card.classList.toggle('expanded');
 }
 
 function renderSourceView(id, section){
@@ -3349,6 +3482,7 @@ async function _boot() {
   loadLayout();
   await Promise.all([load(), loadComp(), loadConfig(), loadSources(), loadHomeLinks()]); // loadConfig() применит тему из Firestore
   loadCustomThemes(); // данные уже в customThemes из loadConfig()
+  healOrphanClassCategories();
   if (classes.length > 0) activeId = classes[0].id;
   renderSidebar();
   renderMain();
