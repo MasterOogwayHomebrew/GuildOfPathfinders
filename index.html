@@ -14,6 +14,32 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-07 (7) — СЕЙДБАР ВЫРЕЗАН В МЕНЮ, ФИКС БАГА "КОМПЕНДИУМ НА ПОЛ-ЭКРАНА", ПОПАП-ПРИВЕТСТВИЕ УБРАН, ССЫЛКИ НА ГЛАВНОЙ, ЗАКРУГЛЕНИЕ КНОПОК. По прямому запросу Adam (аннотированные скриншоты с зачёркнутым сайдбаром + серия отдельных сообщений):
+  1) Постоянный левый сайдбар (.sidebar#sidebar: заголовок "Классы", кнопка "Компендиум", поиск/сортировка, список классов, "+Добавить класс") ПОЛНОСТЬЮ УДАЛЁН из разметки #app-view. .main теперь занимает всю ширину. Вся функциональность переехала внутрь #nav-menu-panel (то самое "отдельное окно" из предыдущего захода): renderNavMenu() теперь пишет ссылки Главная/разделы в подконтейнер #nav-menu-links (а не в весь panel.innerHTML, как раньше) и отдельно переключает видимость #nav-menu-classes-block (поиск+сортировка+список классов+"+Добавить класс", те же id/классы sb-search/sb-sort/class-list/add-class-btn — код renderSidebar()/initSidebarDrag() не тронут, работает по тем же селекторам) — блок показывается только когда активен раздел "Классы". Клик по классу в меню теперь закрывает оверлей (closeNavMenu() вместо старого closeMobileSidebar()).
+  2) Мобильный хостбургер (#mob-menu-btn) больше не открывает отдельный drawer-сайдбар — теперь тоже вызывает toggleNavMenu(), то есть mobile и desktop используют ОДНО и то же меню-окно. Убраны как мёртвый код: toggleMobileSidebar()/closeMobileSidebar(), #mob-overlay (тёмная подложка старого drawer'а), toggleSidebar()/sidebarOff (десктопный collapse), resize-хендл .sidebar-rh (десктопный resize), .comp-nav-btn (дублирующая кнопка "Компендиум" в сайдбаре — теперь то же самое доступно через пункты "Приёмы"/"Боевые стили" в меню). Вся мобильная CSS-секция для drawer'а (.sidebar{position:fixed...}, .mob-open и т.д.) вычищена.
+  3) БАГ "компендиум открывается на пол-экрана справа" (Adam прислал скриншот с "вотето что такое???? тут две страницы в одной") — это была РЕГРЕССИЯ от переноса .sidebar/.main внутрь #app-view в прошлом заходе: CSS-правила body.comp-mode>.sidebar/.main/#screen-compendium использовали дочерний комбинатор (>), который перестал матчиться, когда эти элементы оказались вложены на уровень глубже. Плюс второй, более тонкий баг: даже после замены > на потомка, routeFromHash() снимал r-hidden с #app-view при открытии компендиума через Приёмы/Боевые стили — пустой (но visible, width:100%) #app-view становился flex-соседом #screen-compendium под body{display:flex} и они делили экран пополам. Исправлено: селекторы → descendant-комбинатор; #app-view теперь остаётся r-hidden, пока открыт компендиум (см. комментарий в routeFromHash() и в CSS у body.comp-mode .main). Раз сайдбар теперь целиком удалён, старое правило body.comp-mode .sidebar тоже вычищено как ненужное.
+  4) Компендиум: .comp-group-entries переведён с адаптивных columns:260px 6 на фиксированный column-count:5 (Adam просил ровно 5 колонок).
+  5) Всплывающее окно-приветствие при первом заходе (showWelcome()/closeWelcome(), localStorage guild-welcome-v1) полностью вырезано — функции, CSS (.welcome-overlay/.welcome-modal/...) и вызов setTimeout(showWelcome,600) в _boot() удалены.
+  6) Главная: добавлена строка доп. кнопок-ссылок под шапкой (#home-links-row, глобал homeLinks[], Firestore data/homeLinks — тот же паттерн что sources/COMP). По умолчанию там кнопка "Discord сервер" (та ссылка, что раньше была только в welcome-попапе и action-bar). Owner видит "+ Кнопка" → модал (режим 'homelink', поля Название+Ссылка) → addHomeLinkPrompt()/editHomeLinkPrompt()/deleteHomeLink() — можно добавлять любые внешние ссылки самому, не переписывая их в HTML вручную. Также убрана надпись "Только русский язык" из home-badge (осталось только "Неофициальные переводы").
+  7) Мелкий редизайн: border-radius:var(--radius-sm) добавлен всем кнопкам/инпутам без него (весь топбар компендиума comp-back-btn/comp-search-inp/comp-filter-inp/comp-filter-sel/comp-view-btn/comp-search-go/comp-add-btn/comp-export-btn/comp-drag-btn/comp-settings-btn, плюс .btn/.sb-sort-btn/.intro-save-btn/.intro-cancel-btn/.sp-add-theme-btn/.add-col-btn/.sub-del-btn/.tiny-btn/.ab-btn/.ft-btn/.add-ab-btn/.settings-btn/.sp-btn/.sp-reset-btn/.comp-del-btn/.comp-edit-btn/.comp-add-cat-btn) — раньше были угловатыми, единственные из всего UI без скругления; Adam явно указал на это на скриншоте компендиум-топбара.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright): главная (Discord-кнопка + "+Кнопка" + owner-редактирование источника), страница источника, класс-билдер БЕЗ сайдбара на всю ширину, открытое меню со списком классов (клик по классу выбирает его и закрывает меню — проверено программным кликом), компендиум теперь honestly full-page (не пол-экрана — тот самый "Ничего не найдено" из скриншота Adam’а теперь по центру всей страницы, а не в узкой правой колонке), переход компендиум→классы без залипания, мобильная раскладка (390×844) с тем же единым меню через хостбургер, скруглённые углы во всём топбаре компендиума крупным планом.
+  НЕ СДЕЛАНО в этом заходе (осталось от предыдущих запросов, требует отдельного времени): единая автоматическая палитра классов/подклассов/категорий взамен ручных цветовых пикеров; редизайн плашек умений (.feature-tag) и карточек умений (.ability-card); домашние "плашки" источников с автоматическим счётчиком записей вместо фиксированных подписей SOURCE_SECTIONS — ambiguous, нужно уточнение у Adam что именно считать (записи компендиума? фиксированные разделы?).
+2026-09-07 (6) — РЕДИЗАЙН НАВИГАЦИИ: ИСТОЧНИК→РАЗДЕЛ + МЕНЮ-ОВЕРЛЕЙ. Полноценная реализация задачи из бэклога (была пунктом "ЕЩЁ НЕ СДЕЛАНО" много заходов подряд), по прямому запросу и уточняющим ответам Adam:
+  1) Новые данные: глобальный массив `sources[]` (id/name/desc), Firestore-документ data/sources (loadSources()/saveSources() — тот же паттерн что и COMP). SOURCE_SECTIONS — фиксированный набор из 4 разделов на КАЖДЫЙ источник: Классы/Приёмы/Боевые стили/Справочник (так решил Adam — "вариант 1", фиксированный набор, не свободный конструктор). DEFAULT_SOURCES сидирует существующий laserllama при первом запуске (миграция без потери текущей карточки).
+  2) Главная страница теперь рендерится из sources[] через renderHome() (было захардкожено в HTML) — статическая разметка laserllama осталась как HTML-фолбэк на случай если JS не выполнится (защита от белого экрана), renderHome() перезаписывает её после загрузки данных. Owner видит плитку "+ Добавить источник" (открывает тот же модал что и "+Добавить класс", режим 'source') — ввёл Название+Описание → источник создаётся и сохраняется в Firestore. Гость видит старую плитку-заглушку "Скоро".
+  3) Новая страница источника (#source-view, hash `src/<id>`) — между Главной и разделами: название/описание источника, owner-only кнопки Редактировать/Удалить (editSourcePrompt/deleteSource), и грид из 4 кнопок-разделов. Классы → `src/<id>/classes` (полноценно работает — см. п.4). Приёмы/Боевые стили → `src/<id>/maneuvers|styles`, ведут в общий компендиум (openCompendium()) — ИЗВЕСТНОЕ ОГРАНИЧЕНИЕ: компендиум пока не фильтруется по источнику (записи COMP.entries не имеют sourceId), так что при 2+ источниках там будут видны записи всех — надо будет добавить sourceId в схему COMP при появлении второго реального источника. Справочник → показывает "Скоро" — раздел не спроектирован вообще (это отдельная фича, см. бэклог).
+  4) Классы внутри источника: renderSidebar() теперь фильтрует classes[] по currentSourceId (`cls.category===currentSourceId`) и рисует ПЛОСКИЙ список без папки-группировки (Adam: "эти папки тоже не нужны" — раньше папка была нужна чтобы отличать источники в общем списке, теперь список уже отфильтрован на один источник). Старый режим (все классы, с папками по category) остался рабочим как фолбэк для прямого захода на legacy-хэш `#classes` (currentSourceId=null). Новый класс, добавленный через "+Добавить класс" находясь внутри источника, автоматически получает category=currentSourceId.
+  5) Новое меню-навигация (то что Adam описал как "отдельная кнопка меню которая открывает отдельно окошко которое не влияет на страничку"): кнопка "☰ Меню" (класс .nav-toggle-btn) добавлена в action-bar класс-билдера (оба варианта: пустой и с открытым классом) и в топбар компендиума. Открывает #nav-menu-overlay — fixed-оверлей на весь экран с выезжающей СЛЕВА панелью (.nav-menu-panel, translateX, не влияет на layout основной страницы, поверх неё), внутри: "← Главная" + список разделов ТЕКУЩЕГО источника с подсветкой активного. renderNavMenu()/toggleNavMenu()/closeNavMenu().
+  6) Хэш-схема: `''` → главная, `src/<id>` → страница источника, `src/<id>/classes|maneuvers|styles|reference` → раздел, `classes` (без src/) — legacy, работает как раньше (первый источник). Синхронный inline-скрипт защиты от белого экрана (до Firebase) расширен регуляркой на `#src/*/classes` в дополнение к `#classes`.
+  7) БАГ, пойманный на QA и исправленный: при переходе с Приёмов/Боевых стилей (открывают компендиум, ставят body.classList.add('comp-mode')) на любой другой раздел (например Справочник) — топбар компендиума оставался "залипшим" поверх страницы, т.к. ничего не вызывало closeCompendium(). Пофиксил: routeFromHash() теперь снимает comp-mode при каждом переходе, если новый раздел — не Приёмы/Боевые стили.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, стаб Firebase): главная с реальными sources[] (включая owner-плитку добавления), страница источника, класс-билдер отфильтрованный по источнику, открытое меню-оверлей с подсветкой активного раздела, переход Приёмы→Справочник (бага с залипанием больше нет), полный цикл добавления нового источника через форму (появилась 3-я карточка "KibblesTasty" с корректными данными).
+2026-09-07 (5) — ЧИСТКА UI + ВСЕ ОСТАЛЬНЫЕ ИКОНКИ + ШРИФТ ТЕКСТОВ + ЦВЕТОВОЙ АУДИТ. По прямому запросу Adam:
+  1) Убраны кнопки из action-bar класса: JSON-экспорт, JSON-импорт, чекбокс "+настройки панелей" (id=exp-layout-chk — был мёртвым кодом, ничего не слушало его изменение), "Клон". Функции exportClassesJSON/importClassesJSON/cloneClass остались в коде (не вызываются из UI, безвредны). Компендиумные JSON-экспорт/импорт (comp-export-btn) НЕ трогал — другая область, Adam их не указывал.
+  2) Настройки (⚙): полностью вырезан блок "Темы"+"Палитра" (12 пресетов, кастомные темы, color-picker по 10 CSS-переменным, кнопка Сброс) — customization палитры больше недоступна пользователю. JS (THEME_PRESETS/applyPreset/changeThemeVar/resetTheme/addCustomTheme) оставлен в коде неиспользуемым — если когда-то понадобится вручную поправить cfg.themeVars через консоль, функции на месте. Остались только Интерфейс (шрифт UI, zoom) и Таблица класса (шрифт таблицы).
+  3) Шрифт текстов: .class-desc-input и .ab-body-ce (описание класса + тела умений) возвращены с var(--font-body) [Cormorant Garamond] на var(--font) [Calibri/Candara/Segoe UI] — Adam счёл декоративный шрифт неподходящим для содержательного текста. Cinzel на заголовках/именах не трогал.
+  4) Цветовой аудит "под корень": найдены и заменены оставшиеся хардкод-цвета от старой сине-фиолетовой темы, не связанные с пользовательскими данными: rgba(37,40,64,*) [синие бордеры таблицы/attr-field/comp-flat-list] → rgba(44,61,48,*) [--border]; body::before фоновый radial-gradient (был синий+фиолетовый) → золото+нефрит; дефолт cls.accentColor '#4a6080'(синий)→'#4e7a5c'(--accent); дефолт цвета подкласса '#6a4a8a'(фиолетовый)→'#8a6a3a'(--sub); кнопки Discord/Выйти в action-bar и welcome-попапе — убраны брендовый Discord-blurple (#7289da/rgba(88,101,242)) и Google-blue (#4285f4/rgba(66,133,244)) в пользу палитры (Discord→gold2/rgba(158,124,50), Выйти→приглушённый красный #a06060, уже использующийся в файле для danger-состояний). НЕ трогал: цвета подклассов/категорий компендиума и палитру выбора цвета текста в редакторе — это пользовательские данные/инструмент, не фирменный стиль сайта.
+  5) Остальные функциональные эмодзи → линейные SVG-иконки (новая константа ICO={menu,book,gear,chat,exit,search,palette}, currentColor — наследуют цвет кнопки): ☰ меню (мобильный топбар), 📚 компендиум ×2 (мобильный топбар + сайдбар), ⚙ настройки ×3 (мобильный топбар, десктоп-настройки, настройки компендиума), 💬 Discord ×3 (welcome-попап + action-bar ×2), 👤 выход ×2 (action-bar ×2 — теперь иконка "дверь-стрелка"), 🔍 поиск ×2 (сайдбар — вынесен из placeholder в отдельный span с абсолютным позиционированием, поиск компендиума), 🎨 цвет ×2 (лейбл цвета подкласса, пункт "Цвет текста" в контекстном меню редактора). ВАЖНО: часть иконок (☰,📚,⚙ в мобильном топбаре, 📚+🔍 в сайдбаре) — это статическая HTML-разметка, а не JS-шаблон, поэтому туда SVG вписан буквально (не через ${ICO.x}, который там не исполнился бы) — если будешь трогать эти места, помни про разницу между статикой и JS-темплейтами.
+  ПРОВЕРЕНО ЛОКАЛЬНО: скриншоты home, class-builder (с моковыми данными), открытой панели Настроек, открытого Компендиума — все иконки отрисовались, регрессий не найдено (был один баг при первой попытке — забыл что часть кнопок лежит в статическом HTML, а не в JS-функции; поймал через скриншот, поправил, перепроверил).
 2026-09-07 (4) — КОМПАС ВМЕСТО ЭМОДЗИ (частично). Adam указал что на мокапе я показывал кастомный SVG-компас, а в реальном сайте оставил эмодзи ⚔ — приоритетно исправлен именно компас/эмблема (как Adam и просил, "особенно компас"):
   1) .home-emblem (герой на главной) — эмодзи заменён на inline SVG компас (var(--gold)/var(--accent)/var(--gold2), тот же дизайн что на одобренном мокапе).
   2) .empty-state .big — иконка пустого состояния (2 вхождения: статический HTML + шаблон внутри renderMain()) заменена на приглушённый SVG-компас (var(--muted)).
@@ -38,8 +64,13 @@ CHANGELOG (новое сверху):
 
 ОТКРЫТЫЕ ЗАДАЧИ (см. память для полного списка):
 - Мобильные сокращения через синтаксис "Термин (СОКР)" — десктоп/мобайл разный текст
-- Дерево Источник→Раздел (Приёмы/Боевые стили/Справочник как отдельные пункты навигации, не просто категории компендиума) — ЕЩЁ НЕ СДЕЛАНО, сейчас есть только Главная(#home)/Классы(#classes)
-- Кастомные SVG-иконки вместо эмодзи — ЧАСТИЧНО (компас/эмблема сделаны 2026-09-07(4)); остались ☰,📚×2,⚙×3,💬×3,👤×2,🔍×2,🎨×2
+- Дерево Источник→Раздел — СДЕЛАНО 2026-09-07(6): Главная→источник(#source-view)→раздел(Классы/Приёмы/Боевые стили/Справочник), меню-оверлей слева. ОГРАНИЧЕНИЕ: Приёмы/Боевые стили ведут в общий (нефильтрованный по источнику) компендиум — при появлении 2-го реального источника нужно добавить sourceId в COMP.entries и фильтровать. Справочник — просто "Скоро", раздел не спроектирован.
+- Постоянный сайдбар класс-билдера — ВЫРЕЗАН 2026-09-07(7), список классов переехал в #nav-menu-panel (единое меню для десктопа и мобилки).
+- Кастомные SVG-иконки вместо эмодзи — СДЕЛАНО (компас 2026-09-07(4), остальные функциональные иконки 2026-09-07(5)). Не тронуты: 📁 в placeholder категории, ⬇⬆✕◀▶⧉✎⠿ (typographic-символы, не цветные эмодзи, уже наследуют var(--muted)/var(--gold) через color), цвета подклассов/категорий компендиума (пользовательские данные).
+- Домашняя страница: карточки источников — СДЕЛАНО 2026-09-07(6), рендерятся из sources[], owner добавляет через "+Добавить источник" (форма, как "+Добавить класс"). Доп. кнопки-ссылки (Discord и т.п.) — СДЕЛАНО 2026-09-07(7), homeLinks[]/"+ Кнопка".
+- Единая автоматическая палитра классов/подклассов/категорий вместо ручных цветовых пикеров — ЕЩЁ НЕ СДЕЛАНО (запрошено, не начато).
+- Редизайн .feature-tag (плашки умений в таблице) и .ability-card (карточки умений) — ЕЩЁ НЕ СДЕЛАНО (запрошено, не начато).
+- Домашние "плашки" источников с автоматическим счётчиком записей (сейчас — фиксированные подписи SOURCE_SECTIONS без чисел) — требует уточнения у Adam, что именно считать.
 - Редактор body: toggle для кнопок форматирования, заголовки H1-H3, кастомный разделитель, экспорт — ЕЩЁ НЕ СДЕЛАНО
 ═══════════════════════════════════════════════════════════════════════════════ -->
 <meta charset="UTF-8">
@@ -56,23 +87,15 @@ CHANGELOG (новое сверху):
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;font-size:var(--ui-fs);overflow-x:hidden;}
 
-/* SIDEBAR */
-.sidebar{width:200px;min-width:200px;background:var(--sidebar-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:sticky;top:0;overflow:hidden;flex-shrink:0;position:relative;}
-.sidebar.no-transition{transition:none!important;}
-.sidebar.collapsed{width:36px!important;min-width:36px!important;}
-.sidebar-header{display:flex;align-items:center;justify-content:space-between;padding:10px 10px 8px;border-bottom:1px solid var(--border);flex-shrink:0;gap:4px;}
-.sidebar-label{font-family:var(--font-head);font-size:0.77em;letter-spacing:3px;color:var(--gold2);text-transform:uppercase;white-space:nowrap;overflow:hidden;transition:opacity .15s;font-weight:700;opacity:0.8;}
-.sidebar.collapsed .sidebar-label{opacity:0;}
-.sidebar-toggle{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:0.92em;padding:2px;flex-shrink:0;line-height:1;transition:color .15s;}
-.sidebar-toggle:hover{color:var(--gold);}
+/* КЛАССЫ — список внутри навигационного меню (бывший постоянный сайдбар, вырезан по просьбе Adam:
+   "отдельное меню нужно отдельное окно" — весь список классов теперь живёт в #nav-menu-panel,
+   .main занимает всю ширину #app-view). Классы .sidebar-search/.class-list/.class-item/.add-class-btn/
+   .sidebar-author сохранены как есть — они не завязаны на родителя-сайдбар. */
 .sidebar-search{display:flex;flex-direction:column;gap:4px;padding:8px 8px 6px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.sidebar.collapsed .sidebar-search{display:none;}
 .sb-search-inp{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 8px;font-size:0.85em;outline:none;font-family:var(--font);}
 .sb-search-inp:focus{border-color:var(--gold);}
-.sb-sort-btn{background:transparent;border:1px solid var(--border);color:var(--text);font-size:0.69em;padding:2px 6px;cursor:pointer;font-family:var(--font);letter-spacing:1px;width:100%;transition:all .15s;text-align:left;opacity:0.75;}
+.sb-sort-btn{background:transparent;border:1px solid var(--border);color:var(--text);font-size:0.69em;padding:2px 6px;cursor:pointer;font-family:var(--font);letter-spacing:1px;width:100%;transition:all .15s;text-align:left;opacity:0.75;border-radius:var(--radius-sm);}
 .sb-sort-btn:hover,.sb-sort-btn.active{border-color:var(--gold);color:var(--gold);}
-.sidebar-body{flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;}
-.sidebar.collapsed .sidebar-body{display:none;}
 .class-list{flex:1;}
 .cat-folder{margin-bottom:1px;}
 .cat-header{display:flex;align-items:center;gap:4px;padding:4px 6px 4px 4px;cursor:pointer;user-select:none;border-radius:3px;transition:background .1s;}
@@ -101,12 +124,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .add-class-btn:hover,.add-class-btn.drag-over{border-color:var(--gold);color:var(--gold);}
 .add-class-btn.drag-over{border-style:solid;background:rgba(158,124,50,0.07);}
 .sidebar-author{padding:7px 10px 8px;font-size:0.65em;color:var(--text);letter-spacing:1px;border-top:1px solid var(--border);text-align:center;opacity:0.55;flex-shrink:0;white-space:nowrap;overflow:hidden;}
-.sidebar.collapsed .sidebar-author{display:none;}
-.sidebar-rh{position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:10;}
-.sidebar-rh:hover,.sidebar-rh.active{background:rgba(158,124,50,0.25);}
 
-/* MAIN */
-.main{flex:1;overflow-y:auto;min-width:0;}
+/* MAIN — теперь единственная колонка в #app-view (сайдбар вырезан), занимает всю ширину */
+.main{flex:1;width:100%;overflow-y:auto;min-width:0;}
 
 /* ACTION BAR */
 .action-bar{display:flex;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);background:var(--sidebar-bg);align-items:center;flex-wrap:wrap;}
@@ -121,7 +141,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .class-name-input{font-size:clamp(1em,2.5vw,2em);font-weight:700;color:var(--text);background:transparent;border:none;outline:none;width:100%;letter-spacing:1px;font-family:var(--font-head);}
 .class-name-input::placeholder{color:var(--muted);}
 .class-meta{display:flex;gap:10px;margin-top:4px;align-items:center;}
-.class-desc-input{font-size:1.05em;font-style:italic;color:var(--muted);background:transparent;border:none;outline:none;flex:1;font-family:var(--font-body);}
+.class-desc-input{font-size:1.05em;font-style:italic;color:var(--muted);background:transparent;border:none;outline:none;flex:1;font-family:var(--font);}
 .class-cat-input{font-size:0.77em;color:var(--accent);background:transparent;border:1px solid transparent;outline:none;width:110px;padding:1px 4px;font-family:var(--font);}
 .class-cat-input:focus{border-color:var(--accent);}
 .class-cat-input::placeholder{color:var(--muted);}
@@ -143,19 +163,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .right-rh{position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:10;}
 .right-rh:hover,.right-rh.active{background:rgba(158,124,50,0.25);}
 
-.intro-save-btn{background:var(--gold);border:none;color:#0c0e18;font-size:0.82em;font-weight:700;padding:6px 16px;cursor:pointer;letter-spacing:1px;font-family:var(--font);}
+.intro-save-btn{background:var(--gold);border:none;color:#0c0e18;font-size:0.82em;font-weight:700;padding:6px 16px;cursor:pointer;letter-spacing:1px;font-family:var(--font);border-radius:var(--radius-sm);}
 .intro-save-btn:hover{background:var(--gold2);}
-.intro-cancel-btn{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:0.82em;padding:6px 12px;cursor:pointer;font-family:var(--font);transition:all .15s;}
+.intro-cancel-btn{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:0.82em;padding:6px 12px;cursor:pointer;font-family:var(--font);transition:all .15s;border-radius:var(--radius-sm);}
 .intro-cancel-btn:hover{border-color:var(--muted);color:var(--text);}
 .custom-theme-del{position:absolute;top:-2px;right:-2px;background:rgba(180,60,60,0.9);border:none;color:#fff;font-size:0.65em;padding:1px 4px;cursor:pointer;display:none;line-height:1.4;z-index:2;font-family:var(--font);}
 .theme-preset-cell:hover .custom-theme-del{display:block;}
 .theme-preset-cell{position:relative;}
-.sp-add-theme-btn{margin:4px 8px 6px;padding:5px 8px;background:transparent;border:1px dashed var(--border);color:var(--muted);font-size:0.75em;cursor:pointer;font-family:var(--font);width:calc(100% - 16px);transition:all .15s;letter-spacing:1px;text-align:center;}
+.sp-add-theme-btn{margin:4px 8px 6px;padding:5px 8px;background:transparent;border:1px dashed var(--border);color:var(--muted);font-size:0.75em;cursor:pointer;font-family:var(--font);width:calc(100% - 16px);transition:all .15s;letter-spacing:1px;text-align:center;border-radius:var(--radius-sm);}
 .sp-add-theme-btn:hover{border-color:var(--gold);color:var(--gold);}
 
 /* ATTR PANEL */
 .attr-title{font-size:0.85em;font-weight:700;text-align:center;padding:12px 10px 10px;color:var(--text);border-bottom:1px solid var(--border);}
-.attr-field{border-bottom:1px solid rgba(37,40,64,0.4);}
+.attr-field{border-bottom:1px solid rgba(44,61,48,0.4);}
 .attr-field:last-child{border-bottom:none;}
 .attr-lbl{text-align:right;font-size:0.72em;color:var(--muted);font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 10px 1px;}
 .attr-val{width:100%;background:transparent;border:none;outline:none;font-size:0.95em;color:var(--text);resize:none;overflow:hidden;padding:2px 10px 8px;line-height:1.5;font-family:var(--font);box-sizing:border-box;}
@@ -173,7 +193,7 @@ table.ltable th[data-slot]{white-space:nowrap;word-break:normal;overflow-wrap:no
 table.ltable th:last-child{border-right:none;}
 table.ltable th.grp-hdr{background:rgba(78,122,92,0.08);color:var(--accent);font-size:0.65em;border-bottom:1px solid rgba(78,122,92,0.2);}
 table.ltable th.col-drag-over{background:rgba(158,124,50,0.15)!important;outline:2px solid var(--gold);}
-table.ltable td{padding:4px 5px;background:var(--panel);border-bottom:1px solid rgba(37,40,64,0.4);border-right:1px solid rgba(37,40,64,0.3);vertical-align:top;overflow:hidden;font-size:0.9em;}
+table.ltable td{padding:4px 5px;background:var(--panel);border-bottom:1px solid rgba(44,61,48,0.4);border-right:1px solid rgba(44,61,48,0.3);vertical-align:top;overflow:hidden;font-size:0.9em;}
 table.ltable td:last-child{border-right:none;}
 table.ltable tr:last-child td{border-bottom:none;}
 table.ltable tr:hover td{background:var(--panel2);}
@@ -198,7 +218,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .col-drag-handle{font-size:0.69em;color:var(--muted);cursor:grab;opacity:0.4;flex-shrink:0;}
 .col-drag-handle:hover{opacity:1;color:var(--gold);}
 .add-col-section{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
-.add-col-btn{padding:5px 10px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.69em;letter-spacing:1px;transition:all .15s;font-family:var(--font);}
+.add-col-btn{padding:5px 10px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.69em;letter-spacing:1px;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .add-col-btn:hover{border-color:var(--gold);color:var(--gold);}
 .tpl-section{margin-top:6px;display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
 .tpl-label{font-size:0.69em;color:var(--muted);letter-spacing:1px;font-weight:700;}
@@ -218,7 +238,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .sub-editor-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
 .sub-name{font-size:0.85em;letter-spacing:2px;color:var(--sub);font-weight:700;cursor:text;}
 .sub-name-inp{font-size:0.85em;letter-spacing:2px;font-weight:700;background:transparent;border:none;border-bottom:1px solid var(--sub);outline:none;color:var(--sub);font-family:var(--font);min-width:180px;}
-.sub-del-btn{font-size:0.77em;padding:3px 8px;border:1px solid rgba(180,60,60,0.28);background:transparent;color:#a06060;cursor:pointer;font-family:var(--font);}
+.sub-del-btn{font-size:0.77em;padding:3px 8px;border:1px solid rgba(180,60,60,0.28);background:transparent;color:#a06060;cursor:pointer;font-family:var(--font);border-radius:var(--radius-sm);}
 .sub-del-btn:hover{background:rgba(180,60,60,0.1);}
 .sub-hint{font-size:0.69em;color:var(--muted);margin-bottom:8px;letter-spacing:1px;font-weight:700;}
 .sub-lv-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
@@ -226,7 +246,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .sub-lv-in:focus{border-color:var(--sub);}
 .sub-lv-name{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px 8px;font-size:0.92em;outline:none;font-family:var(--font);}
 .sub-lv-name:focus{border-color:var(--sub);}
-.tiny-btn{font-size:0.69em;padding:3px 7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);}
+.tiny-btn{font-size:0.69em;padding:3px 7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .tiny-btn:hover{border-color:var(--gold);color:var(--gold);}
 .tiny-btn.del:hover{border-color:#c06060;color:#c06060;}
 
@@ -247,14 +267,14 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-type-in:focus{color:var(--gold2);}
 .ab-sub-sel{background:var(--bg);border:1px solid var(--border);color:var(--muted);font-size:0.85em;padding:2px 4px;outline:none;font-family:var(--font);}
 .ab-sub-sel:focus{border-color:var(--sub);}
-.ab-btn{font-size:0.77em;padding:3px 6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);}
+.ab-btn{font-size:0.77em;padding:3px 6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .ab-btn:hover{border-color:var(--gold);color:var(--gold);}
 .ab-btn.del:hover{border-color:#c06060;color:#c06060;}
 .ability-body-wrap{display:none;padding:0 10px 10px 48px;}
 .ability-card.open .ability-body-wrap{display:block;}
 
 /* Rich text editor */
-.ab-body-ce{width:100%;background:rgba(0,0,0,0.18);border:1px solid var(--border);outline:none;font-size:1.08em;color:#c8c0a8;line-height:1.7;padding:7px 10px;min-height:44px;font-family:var(--font-body);word-wrap:break-word;overflow-wrap:break-word;border-radius:var(--radius-sm);}
+.ab-body-ce{width:100%;background:rgba(0,0,0,0.18);border:1px solid var(--border);outline:none;font-size:1.08em;color:#c8c0a8;line-height:1.7;padding:7px 10px;min-height:44px;font-family:var(--font);word-wrap:break-word;overflow-wrap:break-word;border-radius:var(--radius-sm);}
 .ab-body-ce:focus{border-color:var(--gold);}
 .ab-body-ce p{margin:0 0 2px 0;}
 .ab-body-ce b,.ab-body-ce strong{color:var(--text);}
@@ -285,7 +305,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 /* Floating format toolbar */
 .ab-float-toolbar{position:fixed;display:none;background:var(--panel2);border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,0.75);z-index:500;gap:2px;padding:3px 4px;align-items:center;}
 .ab-float-toolbar.vis{display:flex;}
-.ft-btn{background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;font-size:0.85em;padding:3px 7px;font-family:var(--font);transition:all .12s;min-width:28px;text-align:center;line-height:1.3;}
+.ft-btn{background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;font-size:0.85em;padding:3px 7px;font-family:var(--font);transition:all .12s;min-width:28px;text-align:center;line-height:1.3;border-radius:var(--radius-sm);}
 .ft-btn:hover{border-color:var(--border);color:var(--text);background:rgba(255,255,255,0.06);}
 .ft-btn.on{color:var(--gold2);background:rgba(158,124,50,0.12);border-color:rgba(158,124,50,0.3);}
 .ft-sep{width:1px;height:16px;background:var(--border);margin:0 2px;flex-shrink:0;}
@@ -299,13 +319,13 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ctx-sep{height:1px;background:var(--border);margin:3px 0;}
 .ctx-icon{width:16px;text-align:center;opacity:0.7;}
 
-.add-ab-btn{margin-top:8px;padding:8px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.77em;letter-spacing:2px;transition:all .15s;width:100%;font-family:var(--font);}
+.add-ab-btn{margin-top:8px;padding:8px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.77em;letter-spacing:2px;transition:all .15s;width:100%;font-family:var(--font);border-radius:var(--radius-sm);}
 .add-ab-btn:hover{border-color:var(--gold);color:var(--gold);}
 .scale-ctrl{display:flex;align-items:center;gap:4px;}
 .scale-val{font-size:0.77em;color:var(--muted);min-width:34px;text-align:center;}
 
 /* Settings panel */
-.settings-btn{font-size:0.92em;padding:4px 9px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);position:relative;}
+.settings-btn{font-size:0.92em;padding:4px 9px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);position:relative;border-radius:var(--radius-sm);}
 .settings-btn:hover,.settings-btn.open{border-color:var(--gold);color:var(--gold);}
 .settings-panel{position:absolute;top:calc(100% + 6px);right:0;background:var(--panel2);border:1px solid var(--border);box-shadow:0 6px 24px rgba(0,0,0,0.7);z-index:400;min-width:220px;padding:8px 0;display:none;border-radius:var(--radius);}
 .settings-panel.vis{display:block;}
@@ -313,7 +333,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .sp-row{display:flex;align-items:center;gap:6px;padding:5px 14px;}
 .sp-label{flex:1;font-size:0.82em;color:var(--text);}
 .sp-val{font-size:0.77em;color:var(--muted);min-width:36px;text-align:center;}
-.sp-btn{font-size:0.82em;padding:2px 8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .12s;}
+.sp-btn{font-size:0.82em;padding:2px 8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .12s;border-radius:var(--radius-sm);}
 .sp-btn:hover{border-color:var(--gold);color:var(--gold);}
 .sp-sep{height:1px;background:var(--border);margin:5px 0;}
 /* Color swatches in settings */
@@ -321,7 +341,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .sp-color-swatch{width:18px;height:18px;border-radius:2px;border:1px solid var(--border);cursor:pointer;flex-shrink:0;transition:transform .12s,border-color .12s;}
 .sp-color-swatch:hover{transform:scale(1.15);border-color:var(--gold);}
 .sp-color-label{flex:1;font-size:0.82em;color:var(--text);}
-.sp-reset-btn{font-size:0.72em;padding:2px 7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .12s;}
+.sp-reset-btn{font-size:0.72em;padding:2px 7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .12s;border-radius:var(--radius-sm);}
 .sp-reset-btn:hover{border-color:#c06060;color:#c06060;}
 .theme-preset-row{display:flex;gap:5px;padding:5px 14px 8px;align-items:center;}
 .theme-preset-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:5px 14px 8px;}
@@ -357,7 +377,7 @@ input[type=color].cls-accent-dot::-webkit-color-swatch{border:none;border-radius
 .modal-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 11px;font-size:1em;outline:none;margin-bottom:10px;font-family:var(--font);border-radius:var(--radius-sm);}
 .modal-input:focus{border-color:var(--gold);}
 .modal-btns{display:flex;gap:8px;justify-content:flex-end;}
-.btn{font-size:0.77em;letter-spacing:1px;padding:7px 13px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);}
+.btn{font-size:0.77em;letter-spacing:1px;padding:7px 13px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .btn:hover{border-color:var(--gold);color:var(--gold);}
 .btn-g{border-color:rgba(158,124,50,0.5);color:var(--gold);}
 .btn-g:hover{background:rgba(158,124,50,0.1);}
@@ -378,26 +398,12 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   #mob-menu-btn{background:transparent;border:none;color:var(--muted);font-size:1.3em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;}
   #mob-menu-btn:hover{color:var(--gold);}
   #mob-topbar-title{font-size:0.85em;letter-spacing:1px;color:var(--text);font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  /* Тёмная подложка под выдвинутый сайдбар */
-  #mob-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1999;display:none;pointer-events:none;}
-  #mob-overlay.vis{display:block;pointer-events:auto;}
-  /* iOS: выключаем pointer-events у закрытого drawer чтобы не перехватывал тачи */
-  .sidebar:not(.mob-open){pointer-events:none;}
-  .sidebar.mob-open{pointer-events:auto;}
   /* Сдвигаем body вниз под топ-бар */
   body{padding-top:44px;}
   /* Основной контент: стянуть вниз по stacking order — isolation не работает с overflow:auto в Chrome на Android */
   .main{isolation:isolate;z-index:0!important;}
-  /* Сайдбар → выдвижной drawer; will-change:transform вытаскивает в отдельный compositor layer */
-  .sidebar{position:fixed!important;left:0!important;top:44px!important;bottom:0!important;height:calc(100dvh - 44px)!important;width:260px!important;min-width:260px!important;transform:translateX(-100%);transition:transform .25s;z-index:2000!important;will-change:transform;background:linear-gradient(180deg,#223028 0%,#1c2620 100%)!important;box-shadow:4px 0 24px rgba(0,0,0,0.7);}
-  .sidebar.mob-open{transform:translateX(0)!important;}
-  /* Сбрасываем desktop-collapsed состояние на мобильном */
-  .sidebar.collapsed{width:260px!important;min-width:260px!important;}
-  .sidebar.collapsed .sidebar-label,.sidebar.collapsed .sidebar-search,.sidebar.collapsed .sidebar-body{display:flex!important;opacity:1!important;}
-  .sidebar-rh{display:none!important;}
-  #sb-toggle{display:none!important;}
-  /* Компендиум доступен через кнопку в mob-topbar — дублирующую кнопку в sidebar скрываем */
-  .sidebar .comp-nav-btn{display:none!important;}
+  /* Список классов на мобильном — та же панель меню (#nav-menu-panel), что и на десктопе, во всю ширину drawer'а */
+  .nav-menu-panel{width:280px!important;}
   /* Основной контент на всю ширину */
   body{overflow-x:hidden;}
   .main{width:100%;overflow-x:hidden;}
@@ -458,43 +464,37 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
    COMPENDIUM
    ============================================================ */
 #screen-compendium{display:none;flex-direction:column;width:100%;height:100vh;overflow:hidden;background:var(--bg);}
-body.comp-mode>.sidebar,body.comp-mode>#mob-overlay{display:none!important;}
 /* mob-topbar в comp-mode: скрываем стандартные кнопки, показываем кнопку назад */
 body.comp-mode #mob-menu-btn,body.comp-mode #mob-comp-btn,body.comp-mode #mob-settings-btn{display:none!important;}
 body.comp-mode #mob-back-btn{display:flex!important;}
 /* comp-screen на мобильном учитывает topbar */
 @media(max-width:768px){#screen-compendium{padding-top:44px;}}
-body.comp-mode>.main{display:none!important;}
-body.comp-mode>#screen-compendium{display:flex!important;}
-
-/* Nav button in sidebar */
-.comp-nav-btn{display:flex;align-items:center;gap:7px;padding:8px 10px;background:rgba(78,122,92,0.08);border-bottom:1px solid var(--border);cursor:pointer;transition:all .15s;border:none;border-bottom:1px solid var(--border);border-left:2px solid transparent;color:var(--text);opacity:0.8;font-family:var(--font);width:100%;text-align:left;}
-.comp-nav-btn:hover{background:rgba(78,122,92,0.2);border-left-color:var(--gold);color:var(--gold);opacity:1;}
-.comp-nav-btn .cnb-label{font-size:0.78em;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;overflow:hidden;transition:opacity .15s;}
-.sidebar.collapsed .cnb-label{opacity:0;}
+/* Прямой вызов openCompendium() из #mob-comp-btn не меняет hash — .main прячем отдельно (app-view уже скрыт роутером во всех остальных случаях) */
+body.comp-mode .main{display:none!important;}
+body.comp-mode #screen-compendium{display:flex!important;}
 
 /* Top toolbar */
 .comp-topbar{display:flex;align-items:center;gap:5px;padding:7px 10px;background:var(--sidebar-bg);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
-.comp-back-btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:5px 10px;cursor:pointer;font-size:0.82em;font-family:var(--font);transition:all .15s;white-space:nowrap;flex-shrink:0;}
+.comp-back-btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:5px 10px;cursor:pointer;font-size:0.82em;font-family:var(--font);transition:all .15s;white-space:nowrap;flex-shrink:0;border-radius:var(--radius-sm);}
 .comp-back-btn:hover{border-color:var(--gold);color:var(--gold);}
 .comp-search-wrap{position:relative;flex:1;min-width:130px;}
-.comp-search-inp{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 8px 5px 26px;font-size:0.85em;outline:none;font-family:var(--font);}
+.comp-search-inp{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 8px 5px 26px;font-size:0.85em;outline:none;font-family:var(--font);border-radius:var(--radius-sm);}
 .comp-search-inp:focus{border-color:var(--gold);}
 .comp-search-icon{position:absolute;left:7px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:0.8em;pointer-events:none;}
-.comp-filter-inp{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 7px;font-size:0.82em;outline:none;font-family:var(--font);min-width:75px;max-width:120px;}
-.comp-filter-sel{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 7px;font-size:0.82em;outline:none;font-family:var(--font);cursor:pointer;min-width:90px;}
+.comp-filter-inp{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 7px;font-size:0.82em;outline:none;font-family:var(--font);min-width:75px;max-width:120px;border-radius:var(--radius-sm);}
+.comp-filter-sel{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 7px;font-size:0.82em;outline:none;font-family:var(--font);cursor:pointer;min-width:90px;border-radius:var(--radius-sm);}
 .comp-filter-inp:focus,.comp-filter-sel:focus{border-color:var(--gold);}
 .comp-sep{width:1px;height:18px;background:var(--border);flex-shrink:0;margin:0 2px;}
-.comp-view-btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:5px 9px;cursor:pointer;font-size:0.75em;font-family:var(--font);letter-spacing:1px;transition:all .15s;white-space:nowrap;}
+.comp-view-btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:5px 9px;cursor:pointer;font-size:0.75em;font-family:var(--font);letter-spacing:1px;transition:all .15s;white-space:nowrap;border-radius:var(--radius-sm);}
 .comp-view-btn.active{border-color:var(--gold);color:var(--gold);}
-.comp-search-go{background:var(--gold);border:none;color:#0c0e18;padding:5px 14px;cursor:pointer;font-family:var(--font);font-size:0.85em;font-weight:700;flex-shrink:0;}
-.comp-add-btn{background:rgba(78,122,92,0.15);border:1px solid var(--accent);color:var(--accent);padding:5px 10px;cursor:pointer;font-size:0.82em;font-family:var(--font);white-space:nowrap;transition:all .15s;}
+.comp-search-go{background:var(--gold);border:none;color:#0c0e18;padding:5px 14px;cursor:pointer;font-family:var(--font);font-size:0.85em;font-weight:700;flex-shrink:0;border-radius:var(--radius-sm);}
+.comp-add-btn{background:rgba(78,122,92,0.15);border:1px solid var(--accent);color:var(--accent);padding:5px 10px;cursor:pointer;font-size:0.82em;font-family:var(--font);white-space:nowrap;transition:all .15s;border-radius:var(--radius-sm);}
 .comp-add-btn:hover{background:rgba(78,122,92,0.28);color:var(--gold2);}
-.comp-export-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 10px;cursor:pointer;font-size:0.82em;font-family:var(--font);white-space:nowrap;transition:all .15s;}
+.comp-export-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 10px;cursor:pointer;font-size:0.82em;font-family:var(--font);white-space:nowrap;transition:all .15s;border-radius:var(--radius-sm);}
 .comp-export-btn:hover{border-color:var(--gold);color:var(--gold);}
-.comp-drag-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 9px;cursor:pointer;font-size:0.75em;font-family:var(--font);white-space:nowrap;transition:all .15s;}
+.comp-drag-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 9px;cursor:pointer;font-size:0.75em;font-family:var(--font);white-space:nowrap;transition:all .15s;border-radius:var(--radius-sm);}
 .comp-drag-btn.active{border-color:#c04444;color:#c04444;background:rgba(192,68,68,0.08);}
-.comp-settings-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 8px;cursor:pointer;font-size:0.92em;transition:all .15s;flex-shrink:0;}
+.comp-settings-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 8px;cursor:pointer;font-size:0.92em;transition:all .15s;flex-shrink:0;border-radius:var(--radius-sm);}
 .comp-settings-btn:hover,.comp-settings-btn.active{border-color:var(--gold);color:var(--gold);}
 
 /* Type legend */
@@ -509,7 +509,7 @@ body.comp-mode>#screen-compendium{display:flex!important;}
 .comp-group{margin-bottom:18px;}
 .comp-group-label{display:flex;align-items:center;gap:7px;font-family:var(--font-head);font-size:0.7em;letter-spacing:2.5px;text-transform:uppercase;font-weight:700;padding:0 0 6px;border-bottom:2px solid;margin-bottom:6px;white-space:nowrap;}
 .comp-group-label .cgl-icon{font-size:1.2em;line-height:1;}
-.comp-group-entries{columns:260px 6;column-gap:0;column-fill:auto;}
+.comp-group-entries{column-count:5;column-gap:0;column-fill:auto;}
 .comp-empty-zone{padding:4px 6px;color:var(--muted);font-size:0.8em;font-style:italic;}
 .comp-drop-zone{padding:6px 10px;color:var(--muted);font-size:0.78em;text-align:center;border:1px dashed var(--border);border-radius:3px;margin:2px;transition:all .15s;}
 .comp-drop-zone.drag-over{background:rgba(158,124,50,0.1);border-color:var(--gold);color:var(--gold);}
@@ -526,7 +526,7 @@ body.comp-mode>#screen-compendium{display:flex!important;}
 /* Flat list (Name/Level view) */
 .comp-flat-list{display:flex;flex-direction:column;gap:0;}
 .comp-alpha-hdr,.comp-level-hdr{padding:4px 6px;font-size:0.63em;letter-spacing:2px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);margin-top:10px;margin-bottom:2px;}
-.comp-flat-list .comp-entry{border-bottom:1px solid rgba(37,40,64,0.25);border-radius:0;}
+.comp-flat-list .comp-entry{border-bottom:1px solid rgba(44,61,48,0.25);border-radius:0;}
 
 /* Detail view */
 .comp-detail{display:flex;flex-direction:column;width:100%;}
@@ -548,13 +548,13 @@ body.comp-mode>#screen-compendium{display:flex!important;}
 .comp-detail-body-wrap{background:var(--panel);border:1px solid var(--border);border-top:none;padding:10px 14px;min-height:120px;}
 .comp-detail-body-wrap .ab-body-ce{min-height:90px;outline:none;line-height:1.6;}
 .comp-detail-actions{display:flex;gap:8px;padding:10px 0 4px;align-items:center;}
-.comp-del-btn{background:transparent;border:1px solid rgba(192,68,68,0.35);color:rgba(192,68,68,0.65);padding:5px 12px;cursor:pointer;font-size:0.78em;font-family:var(--font);transition:all .15s;}
+.comp-del-btn{background:transparent;border:1px solid rgba(192,68,68,0.35);color:rgba(192,68,68,0.65);padding:5px 12px;cursor:pointer;font-size:0.78em;font-family:var(--font);transition:all .15s;border-radius:var(--radius-sm);}
 .comp-del-btn:hover{border-color:#c04444;color:#c04444;}
 /* View mode */
 .comp-view-toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
 .comp-view-title{font-size:1.5em;font-weight:700;color:var(--text);line-height:1.2;}
 .comp-view-nameen{font-size:0.85em;color:var(--muted);margin-top:2px;}
-.comp-edit-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 14px;cursor:pointer;font-size:0.82em;font-family:var(--font);transition:all .15s;white-space:nowrap;flex-shrink:0;}
+.comp-edit-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 14px;cursor:pointer;font-size:0.82em;font-family:var(--font);transition:all .15s;white-space:nowrap;flex-shrink:0;border-radius:var(--radius-sm);}
 .comp-edit-btn:hover{border-color:var(--gold);color:var(--gold);}
 .comp-view-cat{display:inline-flex;align-items:center;gap:5px;font-size:0.8em;font-weight:600;margin-bottom:12px;}
 .comp-view-meta{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--border);margin-bottom:14px;}
@@ -581,7 +581,7 @@ body.comp-mode>#screen-compendium{display:flex!important;}
 .comp-cat-name-inp:focus,.comp-cat-icon-inp:focus{border-color:var(--gold);}
 .comp-cat-del-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:0.85em;flex-shrink:0;transition:color .15s;}
 .comp-cat-del-btn:hover{color:#c04444;}
-.comp-add-cat-btn{margin:8px;padding:8px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.78em;text-align:center;transition:all .15s;font-family:var(--font);}
+.comp-add-cat-btn{margin:8px;padding:8px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.78em;text-align:center;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .comp-add-cat-btn:hover{border-color:var(--gold);color:var(--gold);}
 
 /* LINKS */
@@ -600,28 +600,14 @@ body.comp-mode>#screen-compendium{display:flex!important;}
 .action-bar{box-shadow:0 1px 0 rgba(158,124,50,0.18);}
 .class-item.active{background:rgba(158,124,50,0.10);border-left:2px solid var(--gold);padding-left:2px;}
 .class-item:hover{background:rgba(255,255,255,0.07);}
-.sidebar{background:linear-gradient(180deg,#1c2620 0%,#141a15 100%);}
 .act-btn:hover{border-color:var(--gold2);color:var(--gold2);box-shadow:0 0 8px rgba(158,124,50,0.15);}
 .hdr-line{background:linear-gradient(90deg,var(--gold),rgba(158,124,50,0.15),transparent);height:2px;}
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--gold);}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 15% 0%,rgba(82,114,160,0.07) 0%,transparent 55%),radial-gradient(ellipse at 85% 100%,rgba(122,90,170,0.06) 0%,transparent 55%);pointer-events:none;z-index:0;}
-.sidebar,.main{position:relative;z-index:1;}
-
-/* WELCOME POPUP */
-.welcome-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
-.welcome-modal{background:var(--panel);border:1px solid var(--border);max-width:520px;width:90%;padding:32px 36px 24px;position:relative;max-height:90vh;overflow-y:auto;}
-.welcome-modal h2{font-size:1.05em;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
-.welcome-modal p{font-size:0.92em;color:var(--text);line-height:1.75;margin-bottom:12px;}
-.welcome-modal p:last-of-type{margin-bottom:0;}
-.welcome-discord-btn{display:inline-flex;align-items:center;gap:8px;margin:14px 0 18px;padding:9px 18px;background:rgba(88,101,242,0.12);border:1px solid rgba(88,101,242,0.5);color:#7289da;font-size:0.92em;text-decoration:none;font-family:var(--font);transition:all .15s;cursor:pointer;}
-.welcome-discord-btn:hover{background:rgba(88,101,242,0.22);border-color:#7289da;}
-.welcome-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;}
-.welcome-close-btn{padding:7px 22px;background:transparent;border:1px solid var(--gold);color:var(--gold);font-size:0.88em;cursor:pointer;font-family:var(--font);transition:all .15s;letter-spacing:1px;}
-.welcome-close-btn:hover{background:rgba(158,124,50,0.1);}
-.welcome-noshow{display:flex;align-items:center;gap:6px;font-size:0.8em;color:var(--muted);cursor:pointer;user-select:none;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 15% 0%,rgba(158,124,50,0.06) 0%,transparent 55%),radial-gradient(ellipse at 85% 100%,rgba(78,122,92,0.07) 0%,transparent 55%);pointer-events:none;z-index:0;}
+.main{position:relative;z-index:1;}
 
 /* ═══ HOME VIEW (2026-09-07, hash-routing #home / #classes) ═══ */
 #app-view{display:flex;width:100%;}
@@ -635,6 +621,16 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-title{font-family:var(--font-head);font-size:2em;font-weight:700;color:var(--gold2);letter-spacing:0.05em;line-height:1.15;text-wrap:balance;margin-bottom:8px;}
 .home-subtitle{font-family:var(--font-body);font-size:1.15em;font-style:italic;color:var(--muted);margin-bottom:18px;}
 .home-badge{display:inline-flex;align-items:center;gap:6px;font-size:0.7em;font-family:var(--font);letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);background:rgba(158,124,50,0.12);border:1px solid rgba(158,124,50,0.3);border-radius:var(--radius-pill);padding:4px 14px;}
+/* Доп. кнопки-ссылки на главной (Discord и любые другие внешние ссылки, admin-addable — см. homeLinks/renderHomeLinks) */
+.home-links-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px;}
+.home-link-btn-wrap{display:inline-flex;align-items:stretch;}
+.home-link-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:rgba(158,124,50,0.1);border:1px solid rgba(158,124,50,0.4);border-radius:var(--radius-pill);color:var(--gold2);font-size:0.85em;text-decoration:none;font-family:var(--font);transition:all .15s;}
+.home-link-btn:hover{background:rgba(158,124,50,0.2);border-color:var(--gold2);box-shadow:0 0 10px rgba(158,124,50,0.15);}
+.home-link-edit,.home-link-del{display:inline-flex;align-items:center;justify-content:center;width:24px;color:var(--muted);cursor:pointer;opacity:0.7;transition:all .15s;}
+.home-link-edit:hover{color:var(--gold);opacity:1;}
+.home-link-del:hover{color:#c06060;opacity:1;}
+.home-link-add-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:transparent;border:1px dashed var(--border);border-radius:var(--radius-pill);color:var(--muted);font-size:0.85em;cursor:pointer;font-family:var(--font);transition:all .15s;}
+.home-link-add-btn:hover{border-color:var(--gold);color:var(--gold);}
 .home-body{max-width:960px;margin:0 auto;padding:0 28px 80px;}
 .home-section-label{font-family:var(--font-head);font-size:0.72em;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:12px;margin-bottom:18px;}
 .home-section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(158,124,50,0.3),transparent);}
@@ -652,6 +648,44 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-source-card.soon:hover::before{opacity:0;}
 .home-soon-label{font-size:0.68em;font-family:var(--font);letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 8px;}
 .home-footer{text-align:center;padding:16px;font-size:0.72em;color:var(--muted);opacity:0.6;letter-spacing:0.05em;}
+.home-source-edit-btn{position:absolute;top:14px;right:14px;color:var(--muted);opacity:0.6;transition:opacity .15s,color .15s;z-index:2;}
+.home-source-edit-btn:hover{opacity:1;color:var(--gold);}
+.home-source-card.add-source-card{border-style:dashed;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-height:96px;}
+.home-source-card.add-source-card .home-source-name{color:var(--muted);}
+.home-source-card.add-source-card:hover{border-color:var(--gold);}
+.home-source-card.add-source-card:hover .home-source-name{color:var(--gold2);}
+
+/* ═══ СТРАНИЦА ИСТОЧНИКА (Источник→Раздел) ═══ */
+#source-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
+#source-view.r-hidden{display:none;}
+.source-hero{max-width:900px;margin:0 auto;padding:50px 24px 10px;text-align:center;}
+.source-home-link{background:transparent;border:none;color:var(--muted);font-family:var(--font);font-size:0.85em;cursor:pointer;margin-bottom:22px;padding:4px 8px;display:inline-flex;align-items:center;gap:6px;transition:color .15s;}
+.source-home-link:hover{color:var(--gold);}
+.source-title{font-family:var(--font-head);font-size:1.9em;font-weight:700;color:var(--gold2);letter-spacing:0.04em;margin-bottom:10px;}
+.source-desc{font-family:var(--font-body);color:var(--muted);font-size:1.08em;margin-bottom:8px;}
+.source-sections-grid{max-width:900px;margin:26px auto 0;padding:0 24px 60px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.source-section-btn{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:22px 14px;text-align:center;cursor:pointer;font-family:var(--font-head);font-size:0.95em;letter-spacing:0.04em;color:var(--text);transition:all .15s;}
+.source-section-btn:hover{border-color:var(--gold);color:var(--gold2);background:var(--panel2);}
+.source-stub{max-width:600px;margin:20px auto 60px;text-align:center;color:var(--muted);font-family:var(--font);padding:0 24px;grid-column:1/-1;}
+
+/* ═══ НАВИГАЦИОННОЕ МЕНЮ (оверлей, не влияет на разметку страницы) ═══ */
+.nav-menu-btn{background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;padding:4px 9px;font-family:var(--font);border-radius:var(--radius-sm);transition:all .15s;display:inline-flex;align-items:center;gap:6px;}
+.nav-menu-btn:hover{border-color:var(--gold);color:var(--gold2);}
+.nav-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;display:none;}
+.nav-menu-overlay.open{display:block;}
+.nav-menu-panel{position:fixed;top:0;left:0;bottom:0;width:270px;max-width:85vw;background:var(--sidebar-bg);border-right:1px solid var(--border);box-shadow:4px 0 24px rgba(0,0,0,0.6);transform:translateX(-100%);transition:transform .2s;display:flex;flex-direction:column;padding:16px 0;overflow-y:auto;}
+.nav-menu-overlay.open .nav-menu-panel{transform:translateX(0);}
+.nav-menu-title{font-family:var(--font-head);font-size:0.7em;letter-spacing:2px;text-transform:uppercase;color:var(--gold2);opacity:0.8;padding:4px 18px 12px;}
+.nav-menu-item{display:flex;align-items:center;gap:10px;padding:10px 18px;color:var(--text);cursor:pointer;font-family:var(--font);font-size:0.92em;border-left:2px solid transparent;transition:all .15s;}
+.nav-menu-item:hover{background:rgba(158,124,50,0.08);color:var(--gold2);}
+.nav-menu-item.active{border-left-color:var(--gold);color:var(--gold2);background:rgba(158,124,50,0.1);}
+.nav-menu-sep{height:1px;background:var(--border);margin:10px 18px;}
+/* Список классов внутри меню — виден только когда открыт раздел "Классы" (см. renderNavMenu) */
+.nav-menu-classes{display:none;flex-direction:column;min-height:0;flex:1;padding:0 4px;}
+.nav-menu-classes.show{display:flex;}
+.nav-menu-classes .sidebar-search{padding-left:14px;padding-right:14px;}
+.nav-menu-classes .class-list{overflow-y:auto;padding:0 8px;}
+.nav-menu-classes .add-class-btn{margin:10px 14px;}
 .action-bar-title{cursor:pointer;}
 </style>
 <!-- Firebase SDK -->
@@ -670,12 +704,13 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     <div class="home-emblem"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--gold)" stroke-opacity=".4" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--gold)" stroke-opacity=".2" stroke-width="1"/><circle cx="32" cy="32" r="12" stroke="var(--gold)" stroke-opacity=".15" stroke-width=".8"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--gold)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--gold)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--gold)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--gold)" fill-opacity=".5"/><path d="M50 14L40 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 50L24 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 14L24 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M50 50L40 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><circle cx="32" cy="32" r="5" fill="var(--accent)" fill-opacity=".6"/><circle cx="32" cy="32" r="2.5" fill="var(--gold2)" fill-opacity=".9"/></svg></div>
     <h1 class="home-title">Гильдия Путеискателей</h1>
     <p class="home-subtitle">Переводы хомбрю-материалов для Dungeons &amp; Dragons 5e</p>
-    <div class="home-badge">Неофициальные переводы · Только русский язык</div>
+    <div class="home-badge">Неофициальные переводы</div>
+    <div class="home-links-row" id="home-links-row"></div>
   </div>
   <div class="home-body">
     <div class="home-section-label">Источники материалов</div>
-    <div class="home-sources-grid">
-      <div class="home-source-card" onclick="location.hash='classes'">
+    <div class="home-sources-grid" id="home-sources-grid">
+      <div class="home-source-card" onclick="location.hash='src/laserllama'">
         <div class="home-source-name">laserllama</div>
         <div class="home-source-desc">Альтернативные классы D&amp;D 5e с расширенными механиками и подклассами</div>
         <div class="home-source-stats">
@@ -693,38 +728,49 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
   <div class="home-footer">© Master Oogway · Гильдия Путеискателей</div>
 </div>
 
+<!-- ═══ СТРАНИЦА ИСТОЧНИКА — landing между Главной и разделами (Классы/Приёмы/...) ═══ -->
+<div id="source-view" class="r-hidden">
+  <div class="source-hero">
+    <button class="source-home-link" onclick="location.hash=''">← Главная</button>
+    <h1 class="source-title" id="source-title"></h1>
+    <p class="source-desc" id="source-desc"></p>
+    <div id="source-edit-wrap" style="display:flex;gap:8px;justify-content:center;margin-top:10px;"></div>
+  </div>
+  <div class="source-sections-grid" id="source-sections-grid"></div>
+  <div class="home-footer">© Master Oogway · Гильдия Путеискателей</div>
+</div>
+
+<!-- ═══ ОВЕРЛЕЙ НАВИГАЦИОННОГО МЕНЮ — единая точка навигации (Главная/разделы/список классов), не влияет на разметку страницы под собой ═══ -->
+<div class="nav-menu-overlay" id="nav-menu-overlay" onclick="if(event.target===this)closeNavMenu()">
+  <div class="nav-menu-panel" id="nav-menu-panel">
+    <div id="nav-menu-links"></div>
+    <div class="nav-menu-classes" id="nav-menu-classes-block">
+      <div class="nav-menu-sep"></div>
+      <div class="nav-menu-title">Классы</div>
+      <div class="sidebar-search" style="position:relative;">
+        <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;display:flex;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg></span>
+        <input class="sb-search-inp" id="sb-search" style="padding-left:26px;" placeholder="Поиск..." oninput="renderSidebar()">
+        <button class="sb-sort-btn" id="sb-sort" onclick="toggleSort()">A–Z Сортировка</button>
+      </div>
+      <div class="class-list" id="class-list"></div>
+      <button class="add-class-btn" onclick="addClassPrompt()">+ Добавить класс</button>
+    </div>
+  </div>
+</div>
+
 <div id="app-view" class="r-hidden">
 
-<!-- Мобильный: фиксированный топ-бар и подложка под drawer (скрыты на десктопе) -->
+<!-- Мобильный: фиксированный топ-бар (скрыт на десктопе) -->
 <div id="mob-topbar" style="display:none">
-  <button id="mob-menu-btn" onclick="toggleMobileSidebar()">☰</button>
+  <button id="mob-menu-btn" onclick="toggleNavMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
   <button id="mob-back-btn" onclick="closeCompendium()" style="display:none;background:transparent;border:none;color:var(--gold);font-size:0.95em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;font-family:var(--font);">◀ Классы</button>
   <span id="mob-topbar-title">Классы</span>
-  <button id="mob-comp-btn" onclick="openCompendium()" style="background:transparent;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;" title="Компендиум">📚</button>
-  <button id="mob-settings-btn" onclick="toggleSettingsPanel()" style="background:transparent;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;" title="Настройки">⚙</button>
-</div>
-<div id="mob-overlay" onclick="closeMobileSidebar()"></div>
-
-<div class="sidebar" id="sidebar">
-  <div class="sidebar-header">
-    <span class="sidebar-label">Классы</span>
-    <button class="sidebar-toggle" id="sb-toggle" onclick="toggleSidebar()">◀</button>
-  </div>
-  <button class="comp-nav-btn" onclick="openCompendium()">📚 <span class="cnb-label">Компендиум</span></button>
-  <div class="sidebar-search">
-    <input class="sb-search-inp" id="sb-search" placeholder="🔍 Поиск..." oninput="renderSidebar()">
-    <button class="sb-sort-btn" id="sb-sort" onclick="toggleSort()">A–Z Сортировка</button>
-  </div>
-  <div class="sidebar-body">
-    <div class="class-list" id="class-list"></div>
-    <button class="add-class-btn" onclick="addClassPrompt()">+ Добавить класс</button>
-  </div>
-  <div class="sidebar-author">© Master Oogway · Гильдия Путеискателей</div>
-  <div class="sidebar-rh" id="sidebar-rh"></div>
+  <button id="mob-comp-btn" onclick="openCompendium()" style="background:transparent;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;" title="Компендиум"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 5c2-1.3 5-1.3 8 0v14c-3-1.3-6-1.3-8 0V5Z"/><path d="M20 5c-2-1.3-5-1.3-8 0v14c3-1.3 6-1.3 8 0V5Z"/></svg></button>
+  <button id="mob-settings-btn" onclick="toggleSettingsPanel()" style="background:transparent;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;" title="Настройки"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="vertical-align:-2px"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg></button>
 </div>
 
 <div class="main" id="main">
-  <div class="empty-state"><div class="big"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--muted)" stroke-opacity=".5" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--muted)" stroke-opacity=".25" stroke-width="1"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--muted)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--muted)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--muted)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--muted)" fill-opacity=".5"/><circle cx="32" cy="32" r="4" fill="var(--muted)" fill-opacity=".6"/></svg></div>Выбери класс из списка слева</div>
+  <div class="empty-state"><div class="big"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--muted)" stroke-opacity=".5" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--muted)" stroke-opacity=".25" stroke-width="1"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--muted)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--muted)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--muted)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--muted)" fill-opacity=".5"/><circle cx="32" cy="32" r="4" fill="var(--muted)" fill-opacity=".6"/></svg></div>Выбери класс через «Меню»</div>
 </div>
 
 </div><!-- /#app-view -->
@@ -733,7 +779,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
      Срабатывает мгновенно при парсинге HTML, ДО загрузки Firebase-скриптов ниже. Если сеть/Firebase
      упадёт, при заходе на #classes всё равно покажется статичный каркас класс-билдера, а не пусто. -->
 <script>
-if (location.hash === '#classes') {
+if (location.hash === '#classes' || /^#src\/[^/]+\/classes$/.test(location.hash)) {
   document.getElementById('home-view').classList.add('r-hidden');
   document.getElementById('app-view').classList.remove('r-hidden');
 }
@@ -809,6 +855,17 @@ const _FB_CONFIG = {
   appId: "1:746974935494:web:cbd39d7ed6d69db079dac7"
 };
 const OWNER_EMAIL = 'aldam.dubaev@gmail.com';
+/* Кастомные линейные SVG-иконки (currentColor — наследуют цвет текста кнопки) взамен эмодзи */
+const ICO = {
+  menu:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
+  book:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 5c2-1.3 5-1.3 8 0v14c-3-1.3-6-1.3-8 0V5Z"/><path d="M20 5c-2-1.3-5-1.3-8 0v14c3-1.3 6-1.3 8 0V5Z"/></svg>',
+  gear:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="vertical-align:-2px"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg>',
+  chat:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 5h16v11H9l-4 4V5Z"/></svg>',
+  exit:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M14 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8"/><path d="M11 12h9m0 0-3-3m3 3-3 3"/></svg>',
+  search:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="vertical-align:-2px"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg>',
+  palette:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 3a9 8 0 1 0 0 16c1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H16a4 4 0 0 0 4-4c0-4.4-3.6-6-8-6Z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
+  link:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M14 5h5v5"/><path d="M19 5 10 14"/><path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>'
+};
 firebase.initializeApp(_FB_CONFIG);
 var db = firebase.firestore();
 var auth = firebase.auth();
@@ -843,10 +900,26 @@ const SLOT_DATA={
 
 /* STATE */
 let classes=[], activeId=null, dragSrc=null, activeSubId=null, modalMode='class';
-let sidebarOff=false, rightOff=false, sortAlpha=false;
+/* ИСТОЧНИКИ (новая навигация Источник→Раздел) */
+let sources=[], currentSourceId=null, editingSourceId=null;
+const SOURCE_SECTIONS=[
+  {id:'classes', label:'Классы'},
+  {id:'maneuvers', label:'Приёмы'},
+  {id:'styles', label:'Боевые стили'},
+  {id:'reference', label:'Справочник'}
+];
+const DEFAULT_SOURCES=[
+  {id:'laserllama', name:'laserllama', desc:'Альтернативные классы D&D 5e с расширенными механиками и подклассами'}
+];
+/* ДОП. КНОПКИ-ССЫЛКИ НА ГЛАВНОЙ (Discord и любые другие внешние ссылки, admin-addable) */
+let homeLinks=[], editingHomeLinkId=null;
+const DEFAULT_HOME_LINKS=[
+  {id:'discord', label:'Discord сервер', url:'https://discord.gg/WXRnWaZ7K'}
+];
+let rightOff=false, sortAlpha=false;
 let collapsedCats=new Set(), sbDragClsId=null;
 let uiScale=1.0, abClickTimer=null;
-let layoutWidths={sidebar:200,right:255};
+let layoutWidths={right:255};
 let activeCeEl=null; // currently focused contenteditable
 let uiTableFontSize=0.85; // em multiplier relative to body font
 let themeVars={}; // CSS variable overrides stored in localStorage
@@ -1112,20 +1185,11 @@ document.addEventListener('mousedown',e=>{
 function loadLayout(){ try{ const r=localStorage.getItem(LAYOUT_KEY); if(r) layoutWidths={...layoutWidths,...JSON.parse(r)}; }catch(e){} }
 function saveLayout(){ localStorage.setItem(LAYOUT_KEY,JSON.stringify(layoutWidths)); }
 function applyLayout(){
-  const sb=document.getElementById('sidebar');
-  if(!sidebarOff){ sb.style.width=layoutWidths.sidebar+'px'; sb.style.minWidth=layoutWidths.sidebar+'px'; }
   const right=document.querySelector('.content-right');
   if(right&&!rightOff){ right.style.width=layoutWidths.right+'px'; right.style.minWidth=layoutWidths.right+'px'; }
 }
 
-/* SIDEBAR / RIGHT TOGGLES */
-function toggleSidebar(){
-  sidebarOff=!sidebarOff;
-  const sb=document.getElementById('sidebar');
-  sb.classList.toggle('collapsed',sidebarOff);
-  if(!sidebarOff){ sb.style.width=layoutWidths.sidebar+'px'; sb.style.minWidth=layoutWidths.sidebar+'px'; }
-  document.getElementById('sb-toggle').textContent=sidebarOff?'▶':'◀';
-}
+/* RIGHT TOGGLE */
 function toggleRight(){
   rightOff=!rightOff;
   const r=document.querySelector('.content-right'); if(!r)return;
@@ -1141,7 +1205,7 @@ function toggleSort(){
 }
 
 /* RESIZE HANDLES */
-let colResizing=null, sbResizing=false, sbStartX=0, sbStartW=0, rightResizing=false, rightStartX=0, rightStartW=0;
+let colResizing=null, rightResizing=false, rightStartX=0, rightStartW=0;
 document.addEventListener('mousedown',e=>{
   const rh=e.target.closest('.col-rh');
   if(rh){ const th=rh.closest('th'); if(!th)return;
@@ -1156,17 +1220,14 @@ document.addEventListener('mousedown',e=>{
     }
     const startW=parseInt(window.getComputedStyle(th).width,10);
     colResizing={colId:th.dataset.col,startX:e.clientX,startW}; rh.classList.add('active'); document.body.classList.add('col-resizing'); e.preventDefault(); return; }
-  if(e.target.id==='sidebar-rh'&&!sidebarOff){ const sb=document.getElementById('sidebar'); sbResizing=true; sbStartX=e.clientX; sbStartW=sb.offsetWidth; e.target.classList.add('active'); sb.classList.add('no-transition'); document.body.classList.add('col-resizing'); e.preventDefault(); return; }
   if(e.target.closest('.right-rh')&&!rightOff){ const r=document.querySelector('.content-right'); rightResizing=true; rightStartX=e.clientX; rightStartW=r.offsetWidth; e.target.closest('.right-rh').classList.add('active'); r.classList.add('no-transition'); document.body.classList.add('col-resizing'); e.preventDefault(); return; }
 });
 document.addEventListener('mousemove',e=>{
   if(colResizing){ const cls=getActive(); if(!cls)return; const dx=e.clientX-colResizing.startX; const nw=Math.max(24,colResizing.startW+dx); if(!cls.colWidths)cls.colWidths={}; cls.colWidths[colResizing.colId]=nw; const th=document.querySelector(`th[data-col="${CSS.escape(colResizing.colId)}"]`); if(th)th.style.width=nw+'px'; return; }
-  if(sbResizing){ const dx=e.clientX-sbStartX; const w=Math.max(140,Math.min(500,sbStartW+dx)); const sb=document.getElementById('sidebar'); sb.style.width=w+'px'; sb.style.minWidth=w+'px'; layoutWidths.sidebar=w; return; }
   if(rightResizing){ const dx=rightStartX-e.clientX; const w=Math.max(160,Math.min(600,rightStartW+dx)); const r=document.querySelector('.content-right'); r.style.width=w+'px'; r.style.minWidth=w+'px'; layoutWidths.right=w; return; }
 });
 document.addEventListener('mouseup',()=>{
   if(colResizing){ const cls=getActive(); if(cls)save(); document.querySelectorAll('.col-rh.active').forEach(el=>el.classList.remove('active')); colResizing=null; document.body.classList.remove('col-resizing'); return; }
-  if(sbResizing){ sbResizing=false; document.getElementById('sidebar').classList.remove('no-transition'); document.querySelectorAll('.sidebar-rh.active').forEach(el=>el.classList.remove('active')); document.body.classList.remove('col-resizing'); saveLayout(); return; }
   if(rightResizing){ rightResizing=false; document.querySelector('.content-right')?.classList.remove('no-transition'); document.querySelectorAll('.right-rh.active').forEach(el=>el.classList.remove('active')); document.body.classList.remove('col-resizing'); saveLayout(); requestAnimationFrame(autoHAll); return; }
 });
 window.addEventListener('resize',()=>requestAnimationFrame(autoHAll));
@@ -1353,41 +1414,6 @@ function applyROMode() {
 }
 
 
-/* WELCOME POPUP */
-const WELCOME_KEY = 'guild-welcome-v1';
-
-function showWelcome() {
-  if (document.getElementById('welcome-overlay')) return;
-  try { if (localStorage.getItem(WELCOME_KEY)) return; } catch(e) {}
-  const el = document.createElement('div');
-  el.id = 'welcome-overlay';
-  el.className = 'welcome-overlay';
-  el.innerHTML = `
-    <div class="welcome-modal">
-      <h2>Добро пожаловать в Гильдию Путеискателей</h2>
-      <p>Перед вами — официальный конструктор классов нашей гильдии. Здесь собраны все классы и подклассы, доступные в наших кампаниях: таблицы развития, умения, подклассы и черты — всё на одном сайте.</p>
-      <p>В разделе <strong>«Компендиум»</strong> вы найдёте полную базу черт, приёмов и способностей с описаниями и источниками. Используйте поиск и фильтры, чтобы быстро найти нужное.</p>
-      <p>Хотите стать частью гильдии? Присоединяйтесь к нашему Discord-серверу — там проходят турниры и ивенты с реальными призами, анонсируются новые кампании и обсуждается всё, что связано с настольными ролевыми играми.</p>
-      <a class="welcome-discord-btn" href="https://discord.gg/WXRnWaZ7K" target="_blank" rel="noopener noreferrer">💬 Присоединиться к серверу Discord</a>
-      <div class="welcome-footer">
-        <button class="welcome-close-btn" onclick="closeWelcome()">Понятно</button>
-        <label class="welcome-noshow">
-          <input type="checkbox" id="welcome-noshow-chk" style="accent-color:var(--gold);cursor:pointer;">
-          Больше не показывать
-        </label>
-      </div>
-    </div>`;
-  document.body.appendChild(el);
-}
-
-function closeWelcome() {
-  const el = document.getElementById('welcome-overlay');
-  if (!el) return;
-  if (document.getElementById('welcome-noshow-chk')?.checked)
-    try { localStorage.setItem(WELCOME_KEY, '1'); } catch(e) {}
-  el.remove();
-}
-
 /* SYNC FEATURES */
 function syncFeatures(cls){
   cls.levels.forEach(lv=>{ lv.features=[]; lv.featureAbIds=[]; lv.subFeatures=[]; });
@@ -1418,29 +1444,35 @@ function renderClassItem(c,cat){
 function renderSidebar(){
   const query=(document.getElementById('sb-search')?.value||'').toLowerCase();
   let list=[...classes];
+  if(currentSourceId) list=list.filter(c=>(c.category||'')===currentSourceId);
   if(query) list=list.filter(c=>c.name.toLowerCase().includes(query)||(c.category||'').toLowerCase().includes(query));
   if(sortAlpha) list=[...list].sort((a,b)=>a.name.localeCompare(b.name,'ru'));
-  const cats={};
-  list.forEach(c=>{ const cat=c.category||''; if(!cats[cat])cats[cat]=[]; cats[cat].push(c); });
-  const catKeys=Object.keys(cats).sort((a,b)=>{ if(!a)return 1; if(!b)return -1; return a.localeCompare(b,'ru'); });
   let html='';
-  catKeys.forEach(cat=>{
-    if(cat){
-      const collapsed=collapsedCats.has(cat);
-      html+=`<div class="cat-folder" data-cat="${esc(cat)}">
-        <div class="cat-header${collapsed?' collapsed':''}" onclick="toggleCat('${esc(cat)}')">
-          <span class="cat-chevron">▼</span>
-          <span class="cat-folder-icon">📁</span>
-          <span class="cat-name" ondblclick="event.stopPropagation();renameCatInline(this,'${esc(cat)}')">${esc(cat)}</span>
-        </div>
-        <div class="cat-children${collapsed?' hidden':''}">
-          ${cats[cat].map(c=>renderClassItem(c,cat)).join('')}
-        </div>
-      </div>`;
-    } else {
-      html+=cats[cat].map(c=>renderClassItem(c,'')).join('');
-    }
-  });
+  if(currentSourceId){
+    // Внутри страницы источника классы уже отфильтрованы — папка-группировка не нужна (плоский список)
+    html=list.map(c=>renderClassItem(c,c.category||'')).join('');
+  } else {
+    const cats={};
+    list.forEach(c=>{ const cat=c.category||''; if(!cats[cat])cats[cat]=[]; cats[cat].push(c); });
+    const catKeys=Object.keys(cats).sort((a,b)=>{ if(!a)return 1; if(!b)return -1; return a.localeCompare(b,'ru'); });
+    catKeys.forEach(cat=>{
+      if(cat){
+        const collapsed=collapsedCats.has(cat);
+        html+=`<div class="cat-folder" data-cat="${esc(cat)}">
+          <div class="cat-header${collapsed?' collapsed':''}" onclick="toggleCat('${esc(cat)}')">
+            <span class="cat-chevron">▼</span>
+            <span class="cat-folder-icon">📁</span>
+            <span class="cat-name" ondblclick="event.stopPropagation();renameCatInline(this,'${esc(cat)}')">${esc(cat)}</span>
+          </div>
+          <div class="cat-children${collapsed?' hidden':''}">
+            ${cats[cat].map(c=>renderClassItem(c,cat)).join('')}
+          </div>
+        </div>`;
+      } else {
+        html+=cats[cat].map(c=>renderClassItem(c,'')).join('');
+      }
+    });
+  }
   document.getElementById('class-list').innerHTML=html;
 }
 
@@ -1521,7 +1553,7 @@ function initSidebarDrag(){
   });
 }
 
-function selectClass(id){ activeId=id; activeSubId=null; renderSidebar(); renderMain(); if(isMob()) closeMobileSidebar(); }
+function selectClass(id){ activeId=id; activeSubId=null; renderSidebar(); renderMain(); closeNavMenu(); }
 function deleteClass(id){
   if(!confirm('Удалить класс?'))return;
   classes=classes.filter(c=>c.id!==id);
@@ -1551,7 +1583,27 @@ function modalOk(){
   if(modalMode==='class'){
     const nc=JSON.parse(JSON.stringify(DEFAULT));
     nc.id=Date.now(); nc.name=v1; nc.desc=v2||'';
+    if(currentSourceId) nc.category=currentSourceId;
     classes.push(nc); closeModal(); save(); selectClass(nc.id);
+  } else if(modalMode==='source'){
+    if(editingSourceId){
+      const s=sources.find(x=>x.id===editingSourceId);
+      if(s){ s.name=v1; s.desc=v2||''; }
+    } else {
+      let id=slugify(v1), n=1;
+      while(sources.some(s=>s.id===id)){ id=slugify(v1)+'-'+(++n); }
+      sources.push({id, name:v1, desc:v2||''});
+    }
+    editingSourceId=null; closeModal(); saveSources(); renderHome();
+  } else if(modalMode==='homelink'){
+    if(!v2)return;
+    if(editingHomeLinkId){
+      const l=homeLinks.find(x=>x.id===editingHomeLinkId);
+      if(l){ l.label=v1; l.url=v2; }
+    } else {
+      homeLinks.push({id:'hl'+Date.now(), label:v1, url:v2});
+    }
+    editingHomeLinkId=null; closeModal(); saveHomeLinks(); renderHomeLinks();
   } else if(modalMode==='sub'){
     const cls=getActive(); if(!cls)return;
     cls.subclasses.push({id:Date.now(),name:v1,desc:v2||''});
@@ -1872,7 +1924,7 @@ function renderSubEditor(cls,sub){
   return `<div class="sub-editor" data-sub-id="${sub.id}"${sc?` style="border-left:2px solid ${sc}44"`:''}>
     <div class="sub-editor-top">
       <span class="sub-name" style="${sc?`color:${sc}`:''}" ondblclick="startSubRename(${sub.id},this)" title="Двойной клик — переименовать">◈ ${esc(sub.name)}</span>
-      <label class="tiny-btn" title="Цвет подкласса" style="${sc?`border-color:${sc}66;color:${sc};`:''};position:relative;overflow:hidden;cursor:pointer;">${sc?`<span style="display:inline-block;width:9px;height:9px;background:${sc};border-radius:1px;vertical-align:middle;margin-right:3px;"></span>`:'🎨 '}Цвет<input type="color" class="color-input-overlay" value="${sc||'#6a4a8a'}" oninput="updateSubColorLive(${sub.id},this.value)" onchange="updateSubColor(${sub.id},this.value)"></label>
+      <label class="tiny-btn" title="Цвет подкласса" style="${sc?`border-color:${sc}66;color:${sc};`:''};position:relative;overflow:hidden;cursor:pointer;">${sc?`<span style="display:inline-block;width:9px;height:9px;background:${sc};border-radius:1px;vertical-align:middle;margin-right:3px;"></span>`:ICO.palette+' '}Цвет<input type="color" class="color-input-overlay" value="${sc||'#8a6a3a'}" oninput="updateSubColorLive(${sub.id},this.value)" onchange="updateSubColor(${sub.id},this.value)"></label>
       <button class="sub-del-btn" onclick="deleteSub(${sub.id})">Удалить подкласс</button>
     </div>
     <div class="sub-hint">Уровни получения умений подкласса:</div>
@@ -1895,7 +1947,7 @@ function renderSubEditor(cls,sub){
 /* SETTINGS BLOCK — вызывается из обеих веток renderMain */
 function _settingsHtml() {
   return `<div style="position:relative;margin-left:auto;">
-    <button class="settings-btn" id="settings-btn" onclick="toggleSettingsPanel()" title="Настройки">⚙ Настройки</button>
+    <button class="settings-btn" id="settings-btn" onclick="toggleSettingsPanel()" title="Настройки">${ICO.gear} Настройки</button>
     <div class="settings-panel" id="settings-panel">
       <div class="sp-section">Интерфейс</div>
       <div class="sp-row">
@@ -1918,31 +1970,6 @@ function _settingsHtml() {
         <span class="sp-val" id="tfs-disp">${Math.round(uiTableFontSize*100)}%</span>
         <button class="sp-btn" onclick="changeTableFs(1)">+</button>
       </div>
-      <div class="sp-owner-only">
-      <div class="sp-sep"></div>
-      <div class="sp-section" style="display:flex;align-items:center;justify-content:space-between;padding-right:14px;padding-bottom:4px;"><span>Темы</span></div>
-      <div class="theme-preset-grid">
-        ${THEME_PRESETS.map(p=>`<div class="theme-preset-cell" onclick="applyPreset('${p.id}')" title="${esc(p.name)}">
-          <div class="theme-preset" style="background:${p.color};box-shadow:inset 0 0 0 1px rgba(0,0,0,0.3);"></div>
-          <span class="theme-preset-name">${esc(p.name)}</span>
-        </div>`).join('')}
-      </div>
-      ${customThemes.length?`<div class="sp-section" style="padding-top:8px;padding-bottom:4px;">Мои темы</div>
-      <div class="theme-preset-grid">
-        ${customThemes.map(p=>`<div class="theme-preset-cell" title="${esc(p.name)}">
-          <div class="theme-preset" style="background:${p.color};box-shadow:inset 0 0 0 1px rgba(0,0,0,0.3);cursor:pointer;" onclick="applyPreset('${p.id}')"></div>
-          <span class="theme-preset-name">${esc(p.name)}</span>
-          <button class="custom-theme-del" onclick="deleteCustomTheme('${p.id}')">✕</button>
-        </div>`).join('')}
-      </div>`:''}
-      <button class="sp-add-theme-btn" onclick="addCustomTheme()" title="Сохранить текущую палитру как свою тему">+ Сохранить тему</button>
-      <div class="sp-sep"></div>
-      <div class="sp-section" style="display:flex;align-items:center;justify-content:space-between;padding-right:14px;padding-bottom:4px;"><span>Палитра</span><button class="sp-reset-btn" onclick="resetTheme()">Сброс</button></div>
-      ${THEME_EXPOSE.map(v=>`<div class="sp-color-row">
-        <span class="sp-color-label">${esc(THEME_LABELS[v])}</span>
-        <input type="color" class="sp-color-swatch" data-var="${v}" value="${themeVars[v]||THEME_DEFAULTS[v]||'#000000'}" oninput="changeThemeVar('${v}',this.value)" title="${v}">
-      </div>`).join('')}
-      </div>
     </div>
   </div>`;
 }
@@ -1957,12 +1984,13 @@ function renderMain(){
   if(!cls){
     main.innerHTML=`
 <div class="action-bar">
+  <button class="nav-menu-btn nav-toggle-btn" onclick="toggleNavMenu()" title="Меню навигации">${ICO.menu} Меню</button>
   <span class="action-bar-title" onclick="location.hash=''" title="На главную">Гильдия Путеискателей</span>
-  <a class="act-btn" href="https://discord.gg/WXRnWaZ7K" target="_blank" rel="noopener noreferrer" title="Дискорд сервер" style="border-color:rgba(88,101,242,0.5);color:#7289da;text-decoration:none;">💬 Discord</a>
-  ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(66,133,244,0.4);color:#4285f4;">👤 Выйти</button>` : ''}
+  <a class="act-btn" href="https://discord.gg/WXRnWaZ7K" target="_blank" rel="noopener noreferrer" title="Дискорд сервер" style="border-color:rgba(158,124,50,0.4);color:var(--gold2);text-decoration:none;">${ICO.chat} Discord</a>
+  ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(180,60,60,0.35);color:#a06060;">${ICO.exit} Выйти</button>` : ''}
   ${_settingsHtml()}
 </div>
-<div class="empty-state"><div class="big"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--muted)" stroke-opacity=".5" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--muted)" stroke-opacity=".25" stroke-width="1"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--muted)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--muted)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--muted)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--muted)" fill-opacity=".5"/><circle cx="32" cy="32" r="4" fill="var(--muted)" fill-opacity=".6"/></svg></div>Выбери класс из списка слева</div>`;
+<div class="empty-state"><div class="big"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--muted)" stroke-opacity=".5" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--muted)" stroke-opacity=".25" stroke-width="1"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--muted)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--muted)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--muted)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--muted)" fill-opacity=".5"/><circle cx="32" cy="32" r="4" fill="var(--muted)" fill-opacity=".6"/></svg></div>Выбери класс через «Меню»</div>`;
     return;
   }
   syncFeatures(cls);
@@ -1971,24 +1999,18 @@ function renderMain(){
 
   main.innerHTML=`
 <div class="action-bar">
+  <button class="nav-menu-btn nav-toggle-btn" onclick="toggleNavMenu()" title="Меню навигации">${ICO.menu} Меню</button>
   <span class="action-bar-title" onclick="location.hash=''" title="На главную">Гильдия Путеискателей</span>
 
-  <button class="act-btn edit-only" onclick="exportClassesJSON()" title="Скачать все классы как JSON">⬇ JSON</button>
-  <button class="act-btn edit-only" onclick="importClassesJSON()" title="Импортировать классы из JSON (слияние по id)">⬆ Импорт</button>
-  <a class="act-btn" href="https://discord.gg/WXRnWaZ7K" target="_blank" rel="noopener noreferrer" title="Дискорд сервер" style="border-color:rgba(88,101,242,0.5);color:#7289da;text-decoration:none;">💬 Discord</a>
-  ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(66,133,244,0.4);color:#4285f4;">👤 Выйти</button>` : ''}
-  <label class="panel-settings-lbl edit-only" style="display:flex;align-items:center;gap:5px;font-size:0.77em;color:var(--muted);cursor:pointer;white-space:nowrap;">
-    <input type="checkbox" id="exp-layout-chk" style="accent-color:var(--gold);cursor:pointer;">
-    + настройки панелей
-  </label>
-  <button class="act-btn edit-only" onclick="cloneClass()" title="Клонировать класс">⧉ Клон</button>
+  <a class="act-btn" href="https://discord.gg/WXRnWaZ7K" target="_blank" rel="noopener noreferrer" title="Дискорд сервер" style="border-color:rgba(158,124,50,0.4);color:var(--gold2);text-decoration:none;">${ICO.chat} Discord</a>
+  ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(180,60,60,0.35);color:#a06060;">${ICO.exit} Выйти</button>` : ''}
   ${_settingsHtml()}
 </div>
 <div class="class-header">
   <input class="class-name-input" value="${esc(cls.name)}" placeholder="Название класса" oninput="upd('name',this.value)">
   <div class="class-meta">
     <input class="class-desc-input" value="${esc(cls.desc)}" placeholder="Описание..." oninput="upd('desc',this.value)">
-    <input type="color" class="cls-accent-dot" value="${cls.accentColor||'#4a6080'}" oninput="updateClassAccent(this.value)" title="Цвет тегов класса в таблице">
+    <input type="color" class="cls-accent-dot" value="${cls.accentColor||'#4e7a5c'}" oninput="updateClassAccent(this.value)" title="Цвет тегов класса в таблице">
     <input class="class-cat-input" value="${esc(cls.category||'')}" placeholder="📁 Категория..." oninput="upd('category',this.value)">
   </div>
   <div class="cls-links-wrap">
@@ -2367,7 +2389,7 @@ function showCtxMenu(e,el){
   html+=`<div class="ctx-sep"></div>`;
   // Foreground color
   const fgColors=['#e0d8c0','#ffffff','#c0c0c0','#808080','#c04040','#c07040','#c0b840','#60a060','#4a90c0','#9060b8','#b8982a','#d4b84a','#4a6080','#6a4a8a','#c06090','#40a0a0','#e88040','#60d060','#8090ff','#ff90b0'];
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxColorGrid()"><span class="ctx-icon">🎨</span>Цвет текста ▸</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxColorGrid()"><span class="ctx-icon">${ICO.palette}</span>Цвет текста ▸</div>`;
   html+=`<div id="ctx-color-panel" style="display:none"><div class="ctx-color-grid">${fgColors.map(c=>`<div class="ctx-color-dot" style="background:${c}" title="${c}" onmousedown="event.preventDefault();applyForeColor('${c}')"></div>`).join('')}</div><label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">+</span> Свой цвет...<input type="color" class="color-input-overlay" value="#ffffff" onchange="applyForeColorFromInput(this)"></label></div>`;
   html+=`<div class="ctx-sep"></div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('removeFormat')"><span class="ctx-icon">✕</span>Убрать форматирование</div>`;
@@ -2572,17 +2594,6 @@ function mobileAbbr(text){
   return words.map(w=>(w[0]||'').toUpperCase()+'.').join(' ');
 }
 
-function toggleMobileSidebar(){
-  const sb=document.getElementById('sidebar');
-  const ov=document.getElementById('mob-overlay');
-  const open=sb.classList.toggle('mob-open');
-  ov.classList.toggle('vis',open);
-}
-function closeMobileSidebar(){
-  document.getElementById('sidebar').classList.remove('mob-open');
-  document.getElementById('mob-overlay').classList.remove('vis');
-}
-
 /* Long-press → context menu on touch devices (fallback for Android/iOS) */
 (function(){
   let _tTimer=null, _tTarget=null, _tX=0, _tY=0, _tFired=false;
@@ -2659,10 +2670,78 @@ function saveComp() {
   db.collection('data').doc('compendium').set(JSON.parse(JSON.stringify(COMP))).catch(e => console.error('saveComp failed:', e));
 }
 
+/* ---------- ИСТОЧНИКИ (главная → источник → разделы) ---------- */
+async function loadSources() {
+  try {
+    const doc = await db.collection('data').doc('sources').get();
+    if (doc.exists && doc.data() && Array.isArray(doc.data().list)) {
+      sources = doc.data().list;
+    }
+  } catch(e) { console.warn('Firestore loadSources failed:', e); }
+  if (!sources || !sources.length) sources = JSON.parse(JSON.stringify(DEFAULT_SOURCES));
+}
+function saveSources() {
+  if (!isOwner) return;
+  db.collection('data').doc('sources').set({ list: JSON.parse(JSON.stringify(sources)) }).catch(e => console.error('saveSources failed:', e));
+}
+function slugify(s){ return String(s||'').toLowerCase().trim().replace(/[^a-zа-я0-9]+/gi,'-').replace(/^-+|-+$/g,'') || ('src'+Date.now()); }
+function addSourcePrompt(){ editingSourceId=null; openModal('Новый источник','Название источника...','Краткое описание...','Создать','source'); }
+function editSourcePrompt(id){
+  const s=sources.find(x=>x.id===id); if(!s) return;
+  editingSourceId=id;
+  openModal('Редактировать источник','Название источника...','Краткое описание...','Сохранить','source');
+  document.getElementById('modal-inp1').value=s.name;
+  document.getElementById('modal-inp2').value=s.desc||'';
+}
+function deleteSource(id){
+  if(!confirm('Удалить источник? Классы внутри него останутся, но пропадут из навигации по источнику.')) return;
+  sources=sources.filter(s=>s.id!==id);
+  saveSources(); renderHome();
+}
+
+/* ДОП. КНОПКИ-ССЫЛКИ НА ГЛАВНОЙ (Discord и т.п. — admin-addable, чтобы не вставлять одну и ту же ссылку везде вручную) */
+async function loadHomeLinks() {
+  try {
+    const doc = await db.collection('data').doc('homeLinks').get();
+    if (doc.exists && doc.data() && Array.isArray(doc.data().list)) {
+      homeLinks = doc.data().list;
+    }
+  } catch(e) { console.warn('Firestore loadHomeLinks failed:', e); }
+  if (!homeLinks || !homeLinks.length) homeLinks = JSON.parse(JSON.stringify(DEFAULT_HOME_LINKS));
+}
+function saveHomeLinks() {
+  if (!isOwner) return;
+  db.collection('data').doc('homeLinks').set({ list: JSON.parse(JSON.stringify(homeLinks)) }).catch(e => console.error('saveHomeLinks failed:', e));
+}
+function addHomeLinkPrompt(){ editingHomeLinkId=null; openModal('Новая кнопка-ссылка','Название кнопки...','Ссылка (https://...)','Добавить','homelink'); }
+function editHomeLinkPrompt(id){
+  const l=homeLinks.find(x=>x.id===id); if(!l) return;
+  editingHomeLinkId=id;
+  openModal('Редактировать кнопку','Название кнопки...','Ссылка (https://...)','Сохранить','homelink');
+  document.getElementById('modal-inp1').value=l.label;
+  document.getElementById('modal-inp2').value=l.url||'';
+}
+function deleteHomeLink(id){
+  if(!confirm('Удалить эту кнопку-ссылку с главной страницы?')) return;
+  homeLinks=homeLinks.filter(l=>l.id!==id);
+  saveHomeLinks(); renderHomeLinks();
+}
+function renderHomeLinks(){
+  const row=document.getElementById('home-links-row');
+  if(!row) return;
+  let html = homeLinks.map(l=>`
+    <span class="home-link-btn-wrap">
+      <a class="home-link-btn" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${ICO.link} ${esc(l.label)}</a>
+      ${isOwner?`<span class="home-link-edit" onclick="editHomeLinkPrompt('${esc(l.id)}')" title="Изменить">${ICO.gear}</span><span class="home-link-del" onclick="deleteHomeLink('${esc(l.id)}')" title="Удалить">✕</span>`:''}
+    </span>`).join('');
+  if(isOwner) html += `<button class="home-link-add-btn" onclick="addHomeLinkPrompt()">+ Кнопка</button>`;
+  row.innerHTML = html;
+}
+
 function openCompendium() {
   compOpenId = null;
   document.body.classList.add('comp-mode');
-  closeMobileSidebar();
+  closeNavMenu();
   const t=document.getElementById('mob-topbar-title');
   if(t) t.textContent='Компендиум';
   renderCompScreen();
@@ -2693,9 +2772,10 @@ function renderCompTopbar() {
   const srcList = [...new Set(COMP.entries.map(e=>e.source||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
   const srcOpts = `<option value="">Источник</option>${srcList.map(s=>`<option value="${esc(s)}"${compFilters.source===s?' selected':''}>${esc(s)}</option>`).join('')}`;
   tb.innerHTML = `
+    <button class="nav-menu-btn nav-toggle-btn" onclick="toggleNavMenu()" title="Меню навигации">${ICO.menu} Меню</button>
     <button class="comp-back-btn" onclick="closeCompendium()">◀ Классы</button>
     <div class="comp-search-wrap">
-      <span class="comp-search-icon">🔍</span>
+      <span class="comp-search-icon">${ICO.search}</span>
       <input class="comp-search-inp" placeholder="Поиск по разделу" value="${esc(compSearch)}" oninput="compSearch=this.value;renderCompBody()">
     </div>
     <select class="comp-filter-sel" onchange="compFilters.catId=this.value;renderCompBody()">${catOpts}</select>
@@ -2711,7 +2791,7 @@ function renderCompTopbar() {
     <button class="comp-drag-btn${compDragMode?' active':''}" onclick="compToggleDrag()" title="Перемещение записей между категориями">${compDragMode?'🔓 Перемещение вкл':'🔒 Переместить'}</button>
     <button class="comp-export-btn" onclick="exportCompendium()" title="Скачать компендиум как JSON">⬇ Компендиум</button>
     <button class="comp-export-btn" onclick="importCompendium()" title="Импортировать компендиум из JSON">⬆ Импорт</button>
-    <button class="comp-settings-btn${document.getElementById('comp-settings-panel').classList.contains('open')?' active':''}" onclick="toggleCompSettings()" title="Управление категориями">⚙</button>
+    <button class="comp-settings-btn${document.getElementById('comp-settings-panel').classList.contains('open')?' active':''}" onclick="toggleCompSettings()" title="Управление категориями">${ICO.gear}</button>
   `;
 }
 
@@ -3062,32 +3142,118 @@ loadTableFs(); applyTableFs();
 /* ═══ HASH ROUTER (Главная ⇄ Классы), добавлено 2026-09-07 ═══
    #classes → показать #app-view (сайдбар+класс-билдер), иначе (пусто/#home) → #home-view.
    Не трогает Firestore/save/render логику — просто show/hide двух верхнеуровневых div. */
+/* ---------- ГЛАВНАЯ / ИСТОЧНИК / МЕНЮ — рендеры ---------- */
+function renderHome(){
+  const grid=document.getElementById('home-sources-grid');
+  if(!grid || !sources.length) return; // данные ещё не загрузились — статичный фолбэк из HTML остаётся как есть
+  let html = sources.map(s=>`
+    <div class="home-source-card" onclick="location.hash='src/${esc(s.id)}'">
+      ${isOwner?`<span class="home-source-edit-btn" onclick="event.stopPropagation();editSourcePrompt('${esc(s.id)}')" title="Редактировать источник">${ICO.gear}</span>`:''}
+      <div class="home-source-name">${esc(s.name)}</div>
+      <div class="home-source-desc">${esc(s.desc||'')}</div>
+      <div class="home-source-stats">${SOURCE_SECTIONS.map(sec=>`<span class="home-stat-tag">${esc(sec.label)}</span>`).join('')}</div>
+    </div>`).join('');
+  html += isOwner
+    ? `<div class="home-source-card add-source-card" onclick="addSourcePrompt()"><div class="home-source-name">+ Добавить источник</div></div>`
+    : `<div class="home-source-card soon"><div class="home-source-name">Новый источник</div><div class="home-source-desc">Здесь появится следующий переведённый автор</div><div class="home-soon-label">Скоро</div></div>`;
+  grid.innerHTML = html;
+  renderHomeLinks();
+}
+
+function renderSourceView(id, section){
+  const s = sources.find(x=>x.id===id);
+  if(!s){ location.hash=''; return; }
+  document.getElementById('source-title').textContent = s.name;
+  document.getElementById('source-desc').textContent = s.desc||'';
+  const editWrap = document.getElementById('source-edit-wrap');
+  if (editWrap) editWrap.innerHTML = isOwner ? `
+    <button class="nav-menu-btn" onclick="editSourcePrompt('${esc(id)}')" title="Редактировать источник">${ICO.gear} Редактировать</button>
+    <button class="nav-menu-btn" onclick="deleteSource('${esc(id)}')" style="border-color:rgba(180,60,60,0.35);color:#a06060;" title="Удалить источник">Удалить</button>
+  ` : '';
+  const grid = document.getElementById('source-sections-grid');
+  grid.innerHTML = SOURCE_SECTIONS.map(sec=>`<div class="source-section-btn" onclick="location.hash='src/${esc(id)}/${sec.id}'">${esc(sec.label)}</div>`).join('');
+  if(section==='reference'){
+    grid.innerHTML += `<div class="source-stub" style="grid-column:1/-1">Раздел «Справочник» пока в разработке. Скоро здесь появится контент.</div>`;
+  }
+}
+
+function renderNavMenu(){
+  const links=document.getElementById('nav-menu-links');
+  if(!links) return;
+  const h=(location.hash||'').replace('#','');
+  const activeSection=(h.match(/^src\/[^/]+\/([^/]+)/)||[])[1] || (h==='classes'?'classes':null);
+  let html = `<div class="nav-menu-item" onclick="closeNavMenu();location.hash=''">← Главная</div>`;
+  if(currentSourceId){
+    const s=sources.find(x=>x.id===currentSourceId);
+    html += `<div class="nav-menu-sep"></div><div class="nav-menu-title">${esc(s?s.name:currentSourceId)}</div>`;
+    html += SOURCE_SECTIONS.map(sec=>`<div class="nav-menu-item${activeSection===sec.id?' active':''}" onclick="closeNavMenu();location.hash='src/${esc(currentSourceId)}/${sec.id}'">${esc(sec.label)}</div>`).join('');
+  }
+  links.innerHTML = html;
+  // Список классов (бывший постоянный сайдбар) показываем в меню только пока открыт раздел "Классы"
+  const showClasses = activeSection==='classes';
+  const block=document.getElementById('nav-menu-classes-block');
+  if(block) block.classList.toggle('show', showClasses);
+  if(showClasses) renderSidebar();
+}
+function toggleNavMenu(){ renderNavMenu(); document.getElementById('nav-menu-overlay').classList.toggle('open'); }
+function closeNavMenu(){ document.getElementById('nav-menu-overlay').classList.remove('open'); }
+
 function routeFromHash(){
   const h = (location.hash || '').replace('#','');
   const home = document.getElementById('home-view');
+  const source = document.getElementById('source-view');
   const app = document.getElementById('app-view');
+  home.classList.add('r-hidden');
+  source.classList.add('r-hidden');
+  app.classList.add('r-hidden');
+  const m = h.match(/^src\/([^/]+)(?:\/(.+))?$/);
+  const wantsCompendium = !!m && (m[2]==='maneuvers' || m[2]==='styles');
+  if (!wantsCompendium && document.body.classList.contains('comp-mode')) closeCompendium(); // сбрасываем "залипший" компендиум при уходе с Приёмов/Боевых стилей
   if (h === 'classes') {
-    home.classList.add('r-hidden');
+    // Legacy-ссылка (до редизайна навигации) — открываем класс-билдер первого источника
+    currentSourceId = sources[0]?.id || null;
     app.classList.remove('r-hidden');
+    renderSidebar();
+  } else if (m) {
+    const srcId = m[1], section = m[2];
+    currentSourceId = srcId;
+    if (!section || section==='reference') {
+      renderSourceView(srcId, section);
+      source.classList.remove('r-hidden');
+    } else if (wantsCompendium) {
+      // Приёмы/Боевые стили пока ведут в общий компендиум (без фильтра по источнику — известное ограничение)
+      // ВАЖНО: app-view держим скрытым (r-hidden) — #screen-compendium сам разворачивается на весь экран
+      // через body.comp-mode CSS. Если снять r-hidden с app-view, оба окажутся видимыми flex-соседями
+      // body{display:flex} и поделят экран пополам — именно так выглядел баг, который поймал Adam.
+      renderSidebar();
+      openCompendium();
+    } else {
+      // classes (и любой другой раздел по умолчанию)
+      app.classList.remove('r-hidden');
+      renderSidebar();
+    }
   } else {
-    app.classList.add('r-hidden');
+    currentSourceId = null;
+    renderHome();
     home.classList.remove('r-hidden');
   }
+  renderNavMenu();
 }
 window.addEventListener('hashchange', routeFromHash);
 
 async function _boot() {
   applyTheme(); // применяем дефолтные переменные; Firestore перетрёт после загрузки
   loadLayout();
-  await Promise.all([load(), loadComp(), loadConfig()]); // loadConfig() применит тему из Firestore
+  await Promise.all([load(), loadComp(), loadConfig(), loadSources(), loadHomeLinks()]); // loadConfig() применит тему из Firestore
   loadCustomThemes(); // данные уже в customThemes из loadConfig()
   if (classes.length > 0) activeId = classes[0].id;
   renderSidebar();
   renderMain();
+  renderHome();
+  renderHomeLinks();
   initSidebarDrag();
   if (!isOwner) applyROMode();
-  routeFromHash(); // показать главную или класс-билдер в зависимости от location.hash
-  setTimeout(showWelcome, 600);
+  routeFromHash(); // показать главную / страницу источника / класс-билдер в зависимости от location.hash
 }
 
 auth.onAuthStateChanged(async function(user) {
