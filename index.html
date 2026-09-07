@@ -1,20 +1,37 @@
 <!DOCTYPE html><html lang="ru"><head>
 <!--
   ╔══════════════════════════════════════════════════════════╗
-  ║   Конструктор классов · Гильдия Путеискателей            ║
+  ║   Гильдия Путеискателей            ║
   ║   Автор / Author : Master Oogway                         ║
   ║   © 2024–2026 Master Oogway. All rights reserved.       ║
   ║   Использование, копирование и распространение          ║
   ║   без разрешения автора запрещено.                       ║
   ╚══════════════════════════════════════════════════════════╝
 -->
+<!-- ═══ AI-MAINTAINER NOTES (Claude) — читать перед правками, обновлять после каждой правки ═══
+ДАННЫЕ: classes[] → save()+renderSidebar()+renderMain(). COMP{categories,entries} → saveComp()+renderCompBody().
+ЗОЛОТОЕ ПРАВИЛО: никогда не трогать Firestore напрямую в JS-патчах — только in-memory глобалы (classes/COMP), иначе перезапишется.
+Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
+
+CHANGELOG (новое сверху):
+2026-09-07 — убрано "Конструктор классов" из title/meta description/HTML-комментария/_PROJECT/action-bar-title×2 — теперь везде просто "Гильдия Путеискателей" (влияло на Discord-превью, т.к. og:meta тегов нет, Discord берёт title+description).
+2026-09-07 — .ab-type-in width 90px→150px — чинили обрезание длинных типов умений (напр. "Бонусное действие" не помещалось).
+2026-09-07 — .comp-group-entries: добавлен column-fill:auto — чинили "перемешанный" вид компендиума (браузерный дефолт column-fill:balance распределяет по высоте непредсказуемо, auto — строго сверху-вниз по колонке).
+
+ОТКРЫТЫЕ ЗАДАЧИ (см. память для полного списка):
+- Мобильные сокращения через синтаксис "Термин (СОКР)" — десктоп/мобайл разный текст
+- Редизайн навигации: hash-routing, дерево Источник→Раздел (сейчас плоская структура)
+- Палитра "Нефрит" (#4e7a5c акцент + золото) одобрена, но НЕ внедрена в этот CSS — сейчас всё ещё старая (--bg:#111428 тёмно-синий)
+- Шрифты Cinzel/Cormorant Garamond одобрены для редизайна, не подключены
+- Редактор body: toggle для кнопок форматирования (bold и т.д. не снимают форматирование при повторном клике), кастомные иконки вместо эмодзи
+═══════════════════════════════════════════════════════════════════════════════ -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="author" content="Master Oogway">
 <meta name="copyright" content="© 2024–2026 Master Oogway. All rights reserved.">
-<meta name="description" content="Конструктор классов · Гильдия Путеискателей. Homebrew tool by Master Oogway.">
+<meta name="description" content="Гильдия Путеискателей. Homebrew tool by Master Oogway.">
 <meta name="generator" content="Гильдия Путеискателей — оригинальный инструмент Master Oogway">
-<title>Конструктор классов · Гильдия Путеискателей</title>
+<title>Гильдия Путеискателей</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
 <style>
 :root{--bg:#111428;--sidebar-bg:#171a30;--panel:#1c2038;--panel2:#222640;--border:#313660;--gold:#c9a832;--gold2:#e2ca55;--text:#f5f0e4;--muted:#d8d4c2;--accent:#5272a0;--sub:#7a5aaa;--font:'Calibri','Candara','Segoe UI',Arial,sans-serif;--ui-fs:13px;--table-fs:0.85em;}
@@ -208,7 +225,7 @@ table.ltable tr.tag-drag-over td{background:rgba(184,152,42,0.1)!important;outli
 .ab-name-disp{font-size:1em;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ab-name-edit{width:100%;background:transparent;border:none;border-bottom:1px solid var(--gold);outline:none;font-size:1em;font-weight:700;color:var(--gold2);font-family:var(--font);}
 .ab-sl-hint-line{font-size:0.69em;color:var(--muted);font-style:italic;line-height:1.2;}
-.ab-type-in{background:transparent;border:none;outline:none;font-size:0.85em;font-style:italic;color:var(--muted);width:90px;font-family:var(--font);cursor:text;}
+.ab-type-in{background:transparent;border:none;outline:none;font-size:0.85em;font-style:italic;color:var(--muted);width:150px;font-family:var(--font);cursor:text;}
 .ab-type-in:focus{color:var(--gold2);}
 .ab-sub-sel{background:var(--bg);border:1px solid var(--border);color:var(--muted);font-size:0.85em;padding:2px 4px;outline:none;font-family:var(--font);}
 .ab-sub-sel:focus{border-color:var(--sub);}
@@ -473,7 +490,7 @@ body.comp-mode>#screen-compendium{display:flex!important;}
 .comp-group{margin-bottom:18px;}
 .comp-group-label{display:flex;align-items:center;gap:7px;font-size:0.67em;letter-spacing:2.5px;text-transform:uppercase;font-weight:700;padding:0 0 6px;border-bottom:2px solid;margin-bottom:6px;white-space:nowrap;}
 .comp-group-label .cgl-icon{font-size:1.2em;line-height:1;}
-.comp-group-entries{columns:260px 6;column-gap:0;}
+.comp-group-entries{columns:260px 6;column-gap:0;column-fill:auto;}
 .comp-empty-zone{padding:4px 6px;color:var(--muted);font-size:0.8em;font-style:italic;}
 .comp-drop-zone{padding:6px 10px;color:var(--muted);font-size:0.78em;text-align:center;border:1px dashed var(--border);border-radius:3px;margin:2px;transition:all .15s;}
 .comp-drop-zone.drag-over{background:rgba(184,152,42,0.1);border-color:var(--gold);color:var(--gold);}
@@ -681,7 +698,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 
 const _AUTHOR='Master Oogway';
 const _COPYRIGHT='© 2024–2026 Master Oogway. All rights reserved.';
-const _PROJECT='Конструктор классов · Гильдия Путеискателей';
+const _PROJECT='Гильдия Путеискателей';
 
 
 /* ================================================================
@@ -1844,7 +1861,7 @@ function renderMain(){
   if(!cls){
     main.innerHTML=`
 <div class="action-bar">
-  <span class="action-bar-title">Конструктор классов · Гильдия Путеискателей</span>
+  <span class="action-bar-title">Гильдия Путеискателей</span>
   <a class="act-btn" href="https://discord.gg/WXRnWaZ7K" target="_blank" rel="noopener noreferrer" title="Дискорд сервер" style="border-color:rgba(88,101,242,0.5);color:#7289da;text-decoration:none;">💬 Discord</a>
   ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(66,133,244,0.4);color:#4285f4;">👤 Выйти</button>` : ''}
   ${_settingsHtml()}
@@ -1858,7 +1875,7 @@ function renderMain(){
 
   main.innerHTML=`
 <div class="action-bar">
-  <span class="action-bar-title">Конструктор классов · Гильдия Путеискателей</span>
+  <span class="action-bar-title">Гильдия Путеискателей</span>
 
   <button class="act-btn edit-only" onclick="exportClassesJSON()" title="Скачать все классы как JSON">⬇ JSON</button>
   <button class="act-btn edit-only" onclick="importClassesJSON()" title="Импортировать классы из JSON (слияние по id)">⬆ Импорт</button>
