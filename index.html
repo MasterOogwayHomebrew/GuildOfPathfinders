@@ -14,6 +14,12 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-08 (20b) — ПОСТ-РЕЛИЗНЫЕ ПРАВКИ ПО ФИДБЕКУ НА ЗАХОД 20 (4 отдельных уточнения после доставки).
+  1) `.ab-body-ce` (текст описания умения, РАЗВЁРНУТОЕ состояние) — Adam скриншотом с красными стрелками уточнил, что в заходе 20 п.1 я убрал рамку только у `.ability-card`, но сама плашка ТЕКСТА при разворачивании умения (`.ab-body-ce`) всё ещё имела свой `background:rgba(0,0,0,0.18)`+`border:1px solid var(--border)` — именно её Adam имел в виду ("не разделительную рамку между умениями... чтобы текст как будто выползал из под плашки на страницу не имея окна"). Убраны фон и рамка полностью (`background:transparent;border:1px solid transparent`), паддинг уменьшен (`7px 10px`→`2px 0`, рамка больше не нужна как визуальный контейнер). Добавлен лёгкий hint при фокусе (`:focus{border-bottom-color:rgba(158,124,50,0.35)}`) — по аналогии с уже существующим паттерном инлайн-редактирования (`.ab-name-edit`), чтобы область редактирования была угадываема при клике, но не выглядела окном в состоянии просмотра.
+  2) Разделение умений внутри группы уровня — Adam: "раздели умения между собой чтобы они не сливались в один блок... как сами уровни например" (побочный эффект п.1 захода 20 — убрав ВСЕ рамки `.ability-card`, умения внутри одной группы стали визуально неразличимы). Добавлен `.ability-card:not(:first-child){border-top:1px solid rgba(255,255,255,0.07)}` — тонкая, малоконтрастная линия-разделитель (не полноценная рамка/окно), только между соседними умениями, не вокруг каждого.
+  3) Звезда-декор (`.title-star`, ✦) — Adam уточнил дважды: (а) "я говорил эту ✦" — заменена кастомная asymmetric SVG-звезда ("sparkle", путь Lucide) на буквальный Unicode-символ U+2726 (BLACK FOUR POINTED STAR), и в `ICO.star` (JS), и в статичной HTML-разметке `.home-title` (2 места); (б) "сделай её больше чтобы была соразмером с текст рядом с которым она стоит" — `.title-star` больше не задаёт свой `width/height` (это был SVG-специфичный размер) — теперь простой `<span>` без явного font-size, наследует размер шрифта родителя (`.home-title` 2.1em / `.action-bar-title` — размер шапки), т.е. автоматически "соразмерна" тексту в любом месте использования. `.home-title` заодно упрощён — убран `display:flex;gap:14px` (нужен был только для выравнивания SVG), просто текстовый блок с инлайн `<span>` через margin.
+  4) БАГ "кнопки на главной работают со 2-3 попытки" (переход на Классы/Справочник/библиотеки) — Adam: "кнопки как-то со второй третьей попытки работают на главной". Диагностика: `renderFixedSectionBtn()` (владелец) вешал `onclick` только на внутренний `<span class="hsb-label">`, а не на весь `<div class="home-section-btn">` — клик по паддингу/зазору вокруг текста плашки (не точно по буквам) не находил обработчика и всплывал к родительской карточке источника (`toggleSourceCard()`), сворачивая аккордеон вместо перехода — это и ощущалось как "надо попасть точнее / повторить попытку". Фикс: `onclick` перенесён на внешний `.home-section-btn` (как уже было у `renderLibraryBtn()` и гостевой ветки того же `renderFixedSectionBtn()` — паттерн просто не был применён последовательно к owner-ветке). Чекбокс-тумблер (`.hsb-toggle`) по-прежнему сам себя `stopPropagation()`, поведение не изменилось.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, новый qa_fixes2.js + regression qa_r19.js/qa_abilities.js/qa_backbtn.js/qa_sections.js/qa_mobgap.js, скриншоты): `.ab-body-ce` без фона/рамки, звезда — `<span>✦</span>` с font-size = размеру родителя (проверено численно на `.home-title` и `.action-bar-title`), клик по паддингу секционной плашки (искусственно смоделирован старый "мёртвый" клик-зона) переходит по хешу с ОДНОГО клика при развёрнутой карточке источника, соседние `.ability-card` получили видимый `border-top`-разделитель (первый — без него). 0 ошибок в консоли (кроме ожидаемых сетевых `ERR_TUNNEL_CONNECTION_FAILED` от Google Fonts в изолированной среде).
 2026-09-08 (20) — ДОРАБОТКА КАРТОЧЕК УМЕНИЙ ПО ГОЛОСОВОМУ ОПИСАНИЮ + КОНТЕКСТНОЕ МЕНЮ ТАБЛИЦЫ + РЕАЛТАЙМ-ФИКС + ДЕКОР + РАЗДЕЛИТЕЛЬ ПЕРЕВОДА. Заход по развёрнутому голосовому сообщению Adam (много пунктов сразу).
   1) Карточки умений (`.ability-card`) — убраны `border-left`/`border-top` полностью (было: цветная левая рамка + разделительная линия между соседними умениями внутри группы уровня) — текст умения теперь визуально "на странице", а не в отдельном окошке, как явно просил Adam ("убрать рамочки... чтобы текст был не в этих окошках а на странице"). Обёртка `.ab-level-group` (спойлер уровня, залитый фон/рамка) — НЕ трогал, её просил оставить как есть. Цвет названия умения без подкласса (`.ab-name-disp`) — `var(--accent)` (зеленоватый, сливался с зелёными плашками `.feature-tag` в таблице) → `var(--gold2)` (золотой); умения с цветом подкласса по-прежнему красятся в `sub.color` — не менялось.
   2) Плашка заголовка уровня (`.ab-level-header`) — убран отдельный `.ab-level-badge` (квадратик с цифрой уровня отдельно от текста "Уровень N" — дублирование, на которое жаловался Adam: "стоит тут единичка потом идёт уровень и один"). Остался один цельный `.ab-level-title` = "Уровень N", чуть крупнее и на var(--gold2) — раньше был просто var(--text).
@@ -342,6 +348,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-level-group.open .ab-level-toggle{transform:rotate(90deg);}
 .ab-level-body{display:none;flex-direction:column;border-top:1px solid var(--border);padding:2px 0;}
 .ab-level-group.open .ab-level-body{display:flex;}
+.ability-card:not(:first-child){border-top:1px solid rgba(255,255,255,0.07);}
 .ability-header{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;user-select:none;}
 .ability-header:hover{background:rgba(255,255,255,0.02);}
 .drag-handle{display:none;}
@@ -362,8 +369,8 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ability-card.open .ability-body-wrap{display:block;}
 
 /* Rich text editor */
-.ab-body-ce{width:100%;background:rgba(0,0,0,0.18);border:1px solid var(--border);outline:none;font-size:1.08em;color:#c8c0a8;line-height:1.7;padding:7px 10px;min-height:44px;font-family:var(--font);word-wrap:break-word;overflow-wrap:break-word;border-radius:var(--radius-sm);}
-.ab-body-ce:focus{border-color:var(--gold);}
+.ab-body-ce{width:100%;background:transparent;border:1px solid transparent;outline:none;font-size:1.08em;color:#c8c0a8;line-height:1.7;padding:2px 0;min-height:44px;font-family:var(--font);word-wrap:break-word;overflow-wrap:break-word;border-radius:var(--radius-sm);}
+.ab-body-ce:focus{border-bottom-color:rgba(158,124,50,0.35);}
 .ab-body-ce p{margin:0 0 2px 0;}
 .ab-body-ce b,.ab-body-ce strong{color:var(--text);}
 .ab-body-ce i,.ab-body-ce em{color:#b8b0a0;}
@@ -713,9 +720,9 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 0%,rgba(78,122,92,0.12),transparent 70%);pointer-events:none;}
 .home-emblem{width:64px;height:64px;opacity:0.9;margin-bottom:14px;}
 .home-emblem svg{width:100%;height:100%;}
-.home-title{font-family:var(--font-display);font-size:2.1em;font-weight:700;color:var(--gold2);letter-spacing:0.02em;line-height:1.15;text-wrap:balance;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:14px;}
-.title-star{display:inline-block;width:0.5em;height:0.5em;flex-shrink:0;color:var(--gold);vertical-align:-0.05em;}
-.action-bar-title .title-star{width:0.55em;height:0.55em;margin:0 9px;vertical-align:-0.08em;}
+.home-title{font-family:var(--font-display);font-size:2.1em;font-weight:700;color:var(--gold2);letter-spacing:0.02em;line-height:1.15;text-wrap:balance;margin-bottom:8px;}
+.title-star{color:var(--gold);margin:0 12px;font-style:normal;}
+.action-bar-title .title-star{margin:0 8px;}
 .home-subtitle{font-family:var(--font);font-size:1.05em;font-style:normal;font-weight:400;color:var(--text);opacity:0.82;letter-spacing:0.02em;margin-bottom:18px;}
 .home-badge{display:inline-flex;align-items:center;gap:6px;font-size:0.7em;font-family:var(--font);letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);background:rgba(158,124,50,0.12);border:1px solid rgba(158,124,50,0.3);border-radius:var(--radius-pill);padding:4px 14px;}
 /* Доп. кнопки-ссылки на главной (Discord и любые другие внешние ссылки, admin-addable — см. homeLinks/renderHomeLinks) */
@@ -827,7 +834,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <div id="home-view">
   <div class="home-hero">
     <div class="home-emblem"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--gold)" stroke-opacity=".4" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--gold)" stroke-opacity=".2" stroke-width="1"/><circle cx="32" cy="32" r="12" stroke="var(--gold)" stroke-opacity=".15" stroke-width=".8"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--gold)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--gold)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--gold)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--gold)" fill-opacity=".5"/><path d="M50 14L40 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 50L24 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 14L24 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M50 50L40 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><circle cx="32" cy="32" r="5" fill="var(--accent)" fill-opacity=".6"/><circle cx="32" cy="32" r="2.5" fill="var(--gold2)" fill-opacity=".9"/></svg></div>
-    <h1 class="home-title"><svg class="title-star" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>Гильдия Путеискателей<svg class="title-star" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg></h1>
+    <h1 class="home-title"><span class="title-star">✦</span>Гильдия Путеискателей<span class="title-star">✦</span></h1>
     <p class="home-subtitle">Переводы хомбрю-материалов для Dungeons &amp; Dragons 5e</p>
     <div class="home-badge">Неофициальные переводы</div>
     <div class="home-links-row" id="home-links-row"></div>
@@ -986,7 +993,7 @@ const ICO = {
   link:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M14 5h5v5"/><path d="M19 5 10 14"/><path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
   back:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>',
   home:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>',
-  star:'<svg class="title-star" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>'
+  star:'<span class="title-star">✦</span>'
 };
 firebase.initializeApp(_FB_CONFIG);
 var db = firebase.firestore();
@@ -3512,8 +3519,9 @@ function renderFixedSectionBtn(s, field, label, secId){
   const on = !!s[field];
   const cnt = on ? sectionCount(secId, s.id) : null;
   if (isOwner) {
-    return `<div class="home-section-btn${on?'':' off'}">
-      <span class="hsb-label" onclick="event.stopPropagation();${on?`location.hash='src/${esc(s.id)}/${secId}'`:''}">${esc(label)}${cnt!=null?` <span class="home-section-count">(${cnt})</span>`:''}</span>
+    const navigate = on ? `event.stopPropagation();location.hash='src/${esc(s.id)}/${secId}'` : 'event.stopPropagation()';
+    return `<div class="home-section-btn${on?'':' off'}" onclick="${navigate}">
+      <span class="hsb-label">${esc(label)}${cnt!=null?` <span class="home-section-count">(${cnt})</span>`:''}</span>
       <label class="hsb-toggle" onclick="event.stopPropagation()" title="${on?'Скрыть раздел':'Показать раздел'}"><input type="checkbox" ${on?'checked':''} onchange="toggleSourceFixedSection('${esc(s.id)}','${field}',this.checked)"></label>
     </div>`;
   }
