@@ -14,6 +14,13 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-08 (19) — МОБИЛЬНЫЙ ФИКС ТОПБАРА + КАСТОМНЫЕ СТРЕЛКИ НАЗАД + РЕДИЗАЙН КАРТОЧЕК УМЕНИЙ ПО УРОВНЯМ + СВОБОДНЫЕ РАЗДЕЛЫ ИСТОЧНИКА. Заход по 5 мобильным скриншотам Adam + отдельный запрос на редизайн умений + архитектурная переделка источников (после уточняющего вопроса).
+  1) БАГ "невидимый топбар" на мобильной главной и в библиотеках (галерея источников/классы) — Adam: "главная страница видео сверху как будто там не видимый топ бар, далее в библиотеках также как будто на верху невидимый топбар". Причина: `body{padding-top:44px}` резервировал место под `#mob-topbar` ГЛОБАЛЬНО, а `#mob-topbar` физически лежит внутри `#app-view` (класс-билдер) — на других топ-уровневых экранах (`#home-view`, `#screen-compendium`, `#classes-gallery-view`) этого топбара просто нет, но пустой отступ 44px оставался, создавая "невидимый бар"-пустоту сверху. Фикс: `padding-top:44px` перенесён с `body` на `#app-view` (единственное место, где топбар реально есть). Заодно найден и убран дублирующий МЁРТВЫЙ `@media(max-width:768px){#screen-compendium{padding-top:44px;}}` — та же ошибка, а `.comp-topbar` там самодостаточен (свой "☰ Меню").
+  2) Кнопки "← Назад"/"На главную" — Adam: "кнопки на главну и назад надо сделать больше и стрелки сделать кастомные а не то что там есть". Добавлена новая иконка `ICO.back` (SVG-стрелка, тот же стиль что остальные `ICO.*`). Заменены текстовые "←"/"◀" на `${ICO.back}` в 4 местах: `#reference-back-btn`, `#gallery-back-btn` (статичная HTML-разметка — SVG продублирован литералом, т.к. `${ICO.*}` доступен только в JS-шаблонах), и 2× `.comp-detail-back` (JS-шаблон `renderCompBody()`). Кнопки укрупнены: добавлена рамка `border:1px solid var(--border)` (hover → var(--gold)), padding увеличен, font-weight:600 — теперь это настоящие кнопки, а не текстовые ссылки. Классы: `.comp-detail-back`, `.source-home-link`.
+  3) РЕДИЗАЙН КАРТОЧЕК УМЕНИЙ (`.ability-card`) — Adam: "делай редизайн карточек умений тоже" (задумка висела с захода 17/18: "сгруппировать в разворачивающиеся спойлеры по уровню, сохранив отдельные умения внутри и синхронизацию с таблицей"). `renderAbilities(cls)` теперь группирует видимые умения по `a.lv` в обёртки `.ab-level-group` (по умолчанию ВСЕ свёрнуты) с кликабельным заголовком `.ab-level-header` (бейдж уровня + "Уровень N" + счётчик умений + шеврон `.ab-level-toggle`), внутри — `.ab-level-body` со списком `.ability-card` (класс/атрибут `data-id` СОХРАНЕНЫ без изменений — все существующие обработчики `toggleAb/addAbility/delAb/jumpToAbility` продолжают работать через `document.querySelector('.ability-card[data-id=...]')`). "Коробочный" визуал (фон/рамка/box-shadow/border-radius) перенесён с `.ability-card` на `.ab-level-group`; сама карточка умения теперь лёгкая вложенная строка (только `border-left` — цвет подкласса как раньше — и `border-top` между соседними умениями). Убран `.ab-lv-badge` (номер уровня на каждой отдельной карточке) — стал избыточен, номер уровня теперь только в заголовке группы. Состояние открыт/закрыт спойлера уровня — новая переменная `let abGroupOpen={}` (ключ `"clsId:lv"`), ТОЛЬКО в памяти сессии, НЕ пишется в Firestore (сознательно — как активная вкладка подкласса `activeSubId`). Новая функция `toggleAbLevelGroup(clsId,lv)`. `jumpToAbility()` (клик по плашке умения в таблице) теперь дополнительно форс-открывает содержащую группу уровня, не только саму карточку. `addAbility()` форс-открывает группу уровня 1 (куда всегда попадает новое умение). Драг умения на другую строку таблицы (`setupTableDrag()` drop-хендлер) — форс-открывает группу нового уровня. `delAb()` — было точечное `.remove()` из DOM, теперь ПОЛНЫЙ ре-рендер списка (`renderAbilities`), т.к. границы спойлера могут измениться, если удалено последнее умение уровня (группа должна исчезнуть). Индивидуальное открытие/закрытие тела умения (описание, поле `a.open`, сохраняется в Firestore как раньше) — НЕ ЗАТРОНУТО, это отдельный, вложенный уровень раскрытия внутри уже открытой группы уровня. Проверено Playwright: сворачивание/разворачивание группы, добавление/удаление умения, драг в таблице, переход по клику на плашку в таблице (с автораскрытием и группы, и карточки) — 0 ошибок в консоли.
+  4) СВОБОДНЫЕ РАЗДЕЛЫ ИСТОЧНИКА (вместо фиксированного `SOURCE_SECTIONS`) — Adam по скриншотам источников: "касаемо источников там разделы эти по типу классы черты и тд когда я делаю новый источник там должен быть не уже шаблон подставленных а возможность добавлять как библиотека, справочник или классы, и также удалять". Уточняющий вопрос (AskUserQuestion): "библиотека" — это несколько РАЗНЫХ именованных библиотек компендиума на источник, или один переключатель видимости? Adam выбрал "несколько именованных библиотек". Плюс отдельное уточнение позже: "ну и отдельно тогл классы и справочник" — эти два типа не именуются и не размножаются, просто вкл/выкл. Итоговая модель: `source.classesOn`/`source.referenceOn` (boolean-тумблеры, по одному экземпляру) + `source.libraries[]` = `[{id,name,order}]` (произвольное количество именованных библиотек компендиума, было жёстко зашито 2: Черты/Приёмы). `COMP.categories[].libId` заменил старый общий на все источники `section:'traits'|'maneuvers'` — категория теперь принадлежит конкретной библиотеке конкретного источника (побочный эффект в плюс: закрывает архитектурный вопрос из захода 17 "категории сознательно общие на все источники"). Миграция ОДНОРАЗОВО в `_boot()`: `healSourceSections()` — источники без `.libraries` получают `classesOn:true, referenceOn:true, libraries:[{id:'styles',name:'Черты'},{id:'maneuvers',name:'Приёмы'}]` — id библиотек СОВПАДАЮТ со старыми hash-путями (`src/<id>/styles`, `src/<id>/maneuvers`), поэтому старые ссылки продолжают работать без изменений в `routeFromHash()`; `healCompCategoryLibIds()` — категории без `libId` получают `styles`/`maneuvers` по старому полю `section`. НОВЫЙ источник (`addSourcePrompt`→`modalOk`) теперь стартует ПОЛНОСТЬЮ ПУСТЫМ: `classesOn:false, referenceOn:false, libraries:[]` — решает исходную жалобу Adam ("я сделал источник свой а там уже и классы и черты и тд, хотя у меня ничего такого ещё даже не придумано"). Главная-аккордеон (`renderHome()`/новые `renderFixedSectionBtn()`/`renderLibraryBtn()`): owner видит Классы/Справочник ВСЕГДА (приглушённые + чекбокс, если выключены — `toggleSourceFixedSection()`), библиотеки — с "✕" на каждой (`deleteSourceLibrary()`, УДАЛЕНИЕ НЕ трогает сами категории/записи в Firestore — они просто становятся недоступны через меню, безопасно) + кнопка "+ Библиотека" (`addLibraryPrompt()`, модалка, новый `modalMode==='library'`); гость видит только ВКЛЮЧЁННЫЕ разделы, без тумблеров/крестиков. `renderNavMenu()` (боковое меню) — та же логика, только включённые разделы. `routeFromHash()` определяет "это библиотека?" через реальный поиск `source.libraries[]` по id вместо хардкода `'maneuvers'||'styles'`. `sectionCount()` считает по `libId` вместо фиксированной пары значений. Убраны как ОКОНЧАТЕЛЬНО УСТАРЕВШИЕ (модель "ровно 2 общие библиотеки", на которой они держались, больше не существует): консольные хелперы `compMoveCatSection()`/`migrateManeuverCatsByName()` (уже были не подключены к UI с захода 15). Проверено Playwright: миграция легаси-источника, миграция категорий, старые hash-ссылки (`/styles`,`/maneuvers`) работают как раньше, тумблер выключает Классы из меню но НЕ ломает прямую ссылку (мягкое скрытие, не удаление), новый источник рендерится полностью пустым (только "+ Библиотека" для owner), добавление/переход/удаление библиотеки, новая категория получает верный `libId`, гостевой вид без контролов редактирования — 0 ошибок в консоли.
+  ОТКРЫТО (не начато в этом заходе): перевод предметов с next.dnd.su/equipment — НЕ на сайт, только в персистентную память Claude как эталон для будущих переводов (см. память, НЕ этот файл).
+  Adam явно попросил забыть до дальнейших указаний: идею "состояний" (conditions) и "правил площадки" — не реализовывать, не предлагать повторно, пока сам не попросит. Также явно попросил игнорировать прикреплённый Claude Project "DnD on PF2e" до тех пор, пока сам не упомянет что пора им заняться.
 2026-09-08 (18) — СЕРИЯ МЕЛКИХ ПРАВОК ПО СКРИНШОТАМ + ДЕФОЛТЫ ЧИТАТЕЛЯ + ПРОХОД ПО МЁРТВОМУ КОДУ.
   1) Плашки подклассов (`.sub-tab`) — Adam: "с плашками подклассов тоже такую же заполненную текстуру как в таблице но не забываем оставить или модифицировать обновить выдачу цвета". Раньше: прозрачный фон, только цветная обводка+текст (`sc`) инлайном, залитый фон (`${sc}18`) был только у АКТИВНОГО таба. Стало: залитый фон у ВСЕХ табов с цветом (`${sc}29` ~16% альфы в покое, `${sc}4d` ~30% у активного — те же альфа-хексы, что у `.feature-tag` в таблице, 0x29/0x45→округлено до `4d` для чуть более явного "выбрано"), цвет текста/обводки (`sc`) сохранён как был — просто добавлена заливка поверх, ничего не потеряно. Дефолтный `.sub-tab` (без цвета/без назначенного подкласса) тоже перекрашен в заливку var(--accent) вместо бледно-белого — для единообразия с остальными "заполненными" пилюлями сайта.
   2) Объединение "Атрибуты" + "Ключевые атрибуты · <Класс>" в один заголовок — Adam: "вот тут тоже вот эти два объединить в одно как я говорил про умения тут сделать тоже самое" (по аналогии с "Умения"→"Классовые умения" из захода 17). Убран отдельный маленький `<div class="section-title">Атрибуты</div>` перед блоком атрибутов; `.attr-title` (тот самый "Ключевые атрибуты · <Класс>" внутри `renderAttrPanel()`) переоформлен в том же стиле, что `.abilities-title`: 1.15em, font-head (Cinzel), var(--gold2), без uppercase/letter-spacing. Теперь один заголовок вместо двух. Заодно замечен и убран целый МЁРТВЫЙ узел разметки — правый десктопный сайдбар атрибутов (`.content-right`/`.right-toggle-bar`/`renderAttrPanel()` дублировался туда же) — см. п.5.
@@ -176,6 +183,11 @@ CHANGELOG (новое сверху):
 - Шрифт описания карточек (Cormorant Garamond) "растворялся"/шумел на мелком кегле — СДЕЛАНО 2026-09-08(18): .home-source-desc переведён на var(--font) (санс-сериф).
 - Дефолты интерфейса для новых читателей (Шрифт UI/Масштаб/Шрифт таблицы) — СДЕЛАНО 2026-09-08(18): 13px/100%/85% → 17px/100%/125%. Это стартовые значения localStorage для тех, у кого его ещё нет, не общий "дефолт сайта" в Firestore.
 - Проход по мёртвому коду по прямому запросу Adam — СДЕЛАНО 2026-09-08(18): убран весь старый сайдбар-с-папками (не рендерился с захода 9), правый десктопный сайдбар атрибутов (был безусловно display:none, дублировал renderAttrPanel впустую), .cls-accent-dot/.class-cat-input (поля убраны в заходе 9, CSS/ro-mode-упоминания оставались), несколько мёртвых функций (deleteCustomTheme/loadTheme/updateClassAccent/toggleSort/getCeTable). Подробности — в CHANGELOG заход 18.
+- Мобильный "невидимый топбар" на главной и в библиотеках — СДЕЛАНО 2026-09-08(19): padding-top:44px перенесён с body на #app-view (единственное место с #mob-topbar), убран дублирующий мёртвый padding-top у #screen-compendium.
+- Кнопки "← Назад"/"На главную" мелкие, текстовые стрелки — СДЕЛАНО 2026-09-08(19): новая иконка ICO.back (SVG), кнопки укрупнены (рамка/padding/font-weight). Затронуты #reference-back-btn, #gallery-back-btn, .comp-detail-back×2, .source-home-link.
+- Редизайн карточек умений (.ability-card) — группировка по уровню в разворачивающиеся спойлеры — СДЕЛАНО 2026-09-08(19): новая обёртка .ab-level-group (свёрнута по умолчанию) с заголовком-уровнем, .ability-card внутри — лёгкая вложенная строка, data-id/toggleAb/jumpToAbility и т.д. не тронуты. Подробности — в CHANGELOG заход 19.
+- Архитектура источников: у нового источника был фиксированный шаблон разделов (Классы/Приёмы/Черты/Справочник) — СДЕЛАНО 2026-09-08(19): source.classesOn/.referenceOn (тумблеры) + source.libraries[] (свободные именованные библиотеки, добавление/удаление). Новый источник стартует пустым. Миграция сохранила старые hash-ссылки (/styles, /maneuvers).
+- Перевод предметов (next.dnd.su/equipment) как эталон для будущих переводов — Adam явно попросил (заход 19): НЕ на сайт, только в персистентную память Claude. НЕ СДЕЛАНО.
 ═══════════════════════════════════════════════════════════════════════════════ -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -306,13 +318,23 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .tiny-btn:hover{border-color:var(--gold);color:var(--gold);}
 .tiny-btn.del:hover{border-color:#c06060;color:#c06060;}
 
-/* ABILITIES */
-.abilities-list{display:flex;flex-direction:column;gap:2px;}
-.ability-card{background:var(--panel);border:1px solid var(--border);border-left:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.2);}
-.ability-header{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;user-select:none;}
+/* ABILITIES — сгруппированы по уровню в разворачивающиеся спойлеры (заход 19) */
+.abilities-list{display:flex;flex-direction:column;gap:6px;}
+.ab-level-group{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.2);}
+.ab-level-header{display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;user-select:none;}
+.ab-level-header:hover{background:rgba(255,255,255,0.03);}
+.ab-level-badge{font-family:var(--font-head);font-size:0.95em;color:var(--accent);background:var(--panel2);border:1px solid var(--accent);border-radius:var(--radius-sm);min-width:26px;text-align:center;padding:2px 4px;flex-shrink:0;font-weight:700;letter-spacing:0.4px;}
+.ab-level-title{font-family:var(--font-head);font-size:1em;font-weight:600;letter-spacing:0.4px;color:var(--text);flex:1;}
+.ab-level-count{font-size:0.75em;color:var(--muted);background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:var(--radius-pill);padding:1px 8px;flex-shrink:0;}
+.ab-level-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;}
+.ab-level-group.open .ab-level-toggle{transform:rotate(90deg);}
+.ab-level-body{display:none;flex-direction:column;border-top:1px solid var(--border);}
+.ab-level-group.open .ab-level-body{display:flex;}
+.ability-card{border-left:1px solid var(--border);}
+.ability-card:not(:first-child){border-top:1px solid var(--border);}
+.ability-header{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 14px;cursor:pointer;user-select:none;}
 .ability-header:hover{background:rgba(255,255,255,0.02);}
 .drag-handle{display:none;}
-.ab-lv-badge{font-family:var(--font-head);font-size:0.95em;color:var(--muted);background:var(--panel2);border:1px solid var(--border);min-width:26px;text-align:center;padding:2px 4px;flex-shrink:0;font-weight:700;letter-spacing:0.4px;}
 .ab-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;margin-left:auto;}
 .ability-card.open .ab-toggle{transform:rotate(90deg);}
 .ab-name-wrap{flex:1;min-width:60px;display:flex;flex-direction:column;gap:1px;overflow:hidden;}
@@ -326,7 +348,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-btn{font-size:0.77em;padding:3px 6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .ab-btn:hover{border-color:var(--gold);color:var(--gold);}
 .ab-btn.del:hover{border-color:#c06060;color:#c06060;}
-.ability-body-wrap{display:none;padding:0 10px 10px 48px;}
+.ability-body-wrap{display:none;padding:0 10px 10px 14px;}
 .ability-card.open .ability-body-wrap{display:block;}
 
 /* Rich text editor */
@@ -453,8 +475,13 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   #mob-menu-btn{background:transparent;border:none;color:var(--muted);font-size:1.3em;cursor:pointer;padding:6px;line-height:1;flex-shrink:0;}
   #mob-menu-btn:hover{color:var(--gold);}
   #mob-topbar-title{font-size:0.85em;letter-spacing:1px;color:var(--text);font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  /* Сдвигаем body вниз под топ-бар */
-  body{padding-top:44px;}
+  /* Сдвигаем вниз под топ-бар ТОЛЬКО #app-view (класс-билдер) — единственная вьюха, которая реально
+     содержит #mob-topbar (он лежит внутри неё в разметке). Раньше padding-top:44px висел на body
+     ГЛОБАЛЬНО — на Главной/Классах/Библиотеках, где #mob-topbar физически не существует (он и не
+     рендерится там — #app-view скрыт), это создавало пустой "фантомный" зазор сверху без видимого
+     топбара — заход 19, Adam: "как будто там не видимый топ бар". У компендиума/библиотек — своя
+     навигация внутри .comp-topbar (там уже есть кнопка "☰ Меню"), отдельный отступ не нужен. */
+  #app-view{padding-top:44px;}
   /* Основной контент: стянуть вниз по stacking order — isolation не работает с overflow:auto в Chrome на Android */
   .main{isolation:isolate;z-index:0!important;}
   /* Список классов на мобильном — та же панель меню (#nav-menu-panel), что и на десктопе, во всю ширину drawer'а */
@@ -510,9 +537,11 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
    COMPENDIUM
    ============================================================ */
 #screen-compendium{display:none;flex-direction:column;width:100%;height:100vh;overflow:hidden;background:var(--bg);}
-/* mob-topbar в comp-mode: гамбургер-меню остаётся видимым — навигация теперь всегда только через Меню (кнопки-ярлыки компендиума/настроек в топбаре убраны, см. запись 10 — были избыточны, дублировали #settings-btn/пункты меню) */
-/* comp-screen на мобильном учитывает topbar */
-@media(max-width:768px){#screen-compendium{padding-top:44px;}}
+/* #screen-compendium — отдельная top-level вьюха (сиблинг #app-view, НЕ его потомок) — #mob-topbar
+   физически лежит внутри #app-view и здесь никогда не рендерится; своя навигация — кнопка "☰ Меню"
+   прямо внутри .comp-topbar. Мобильный padding-top:44px "про запас" под несуществующий здесь топбар
+   был чистым мёртвым зазором — убран заходом 19 вместе с тем же багом на body (см. комментарий выше
+   у #app-view{padding-top:44px}). */
 /* Прямой вызов openCompendium() из #mob-comp-btn не меняет hash — .main прячем отдельно (app-view уже скрыт роутером во всех остальных случаях) */
 body.comp-mode .main{display:none!important;}
 body.comp-mode #screen-compendium{display:flex!important;}
@@ -577,8 +606,8 @@ body.comp-mode #screen-compendium{display:flex!important;}
 
 /* Detail view */
 .comp-detail{display:flex;flex-direction:column;width:100%;}
-.comp-detail-back{display:inline-flex;align-items:center;gap:5px;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:0.85em;font-family:var(--font);padding:0 0 10px 0;transition:color .15s;}
-.comp-detail-back:hover{color:var(--gold);}
+.comp-detail-back{display:inline-flex;align-items:center;gap:8px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:0.92em;font-weight:600;font-family:var(--font);padding:7px 14px;margin-bottom:12px;transition:all .15s;border-radius:var(--radius-sm);}
+.comp-detail-back:hover{border-color:var(--gold);color:var(--gold);}
 .comp-detail-head{background:var(--panel2);padding:12px 14px 10px;border:1px solid var(--border);}
 .comp-detail-name-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
 .comp-detail-name{font-size:1.25em;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;font-family:var(--font);flex:1;min-width:120px;padding:2px 4px;}
@@ -695,10 +724,21 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-source-stats{display:flex;gap:8px;flex-wrap:wrap;}
 .home-stat-tag{font-size:0.72em;font-family:var(--font);color:var(--accent);background:rgba(78,122,92,0.12);border:1px solid rgba(78,122,92,0.3);border-radius:var(--radius-sm);padding:2px 9px;letter-spacing:0.03em;}
 .home-source-sections{display:flex;flex-wrap:wrap;gap:8px;max-height:0;opacity:0;overflow:hidden;transition:max-height .32s ease,opacity .22s ease,margin-top .32s ease;margin-top:0;}
-.home-source-card.expanded .home-source-sections{max-height:200px;opacity:1;margin-top:14px;}
-.home-section-btn{font-size:0.78em;font-family:var(--font);color:var(--accent);background:rgba(78,122,92,0.1);border:1px solid rgba(78,122,92,0.32);border-radius:var(--radius-sm);padding:6px 13px;letter-spacing:0.02em;cursor:pointer;transition:all .15s;}
+.home-source-card.expanded .home-source-sections{max-height:360px;opacity:1;margin-top:14px;}
+.home-section-btn{display:inline-flex;align-items:center;gap:6px;font-size:0.78em;font-family:var(--font);color:var(--accent);background:rgba(78,122,92,0.1);border:1px solid rgba(78,122,92,0.32);border-radius:var(--radius-sm);padding:6px 13px;letter-spacing:0.02em;cursor:pointer;transition:all .15s;}
 .home-section-btn:hover{border-color:var(--accent);background:rgba(78,122,92,0.22);color:var(--gold2);}
 .home-section-count{color:var(--gold2);font-weight:700;font-size:0.95em;opacity:1;}
+/* Заход 19: тумблер Классы/Справочник (выкл — приглушённая плашка, чекбокс включает обратно без перехода по ссылке) */
+.home-section-btn.off{opacity:0.45;background:rgba(255,255,255,0.03);border-color:var(--border);cursor:default;}
+.home-section-btn.off:hover{border-color:var(--border);background:rgba(255,255,255,0.03);color:var(--accent);}
+.hsb-label{cursor:pointer;}
+.home-section-btn.off .hsb-label{cursor:default;}
+.hsb-toggle{display:inline-flex;align-items:center;cursor:pointer;}
+.hsb-toggle input{width:13px;height:13px;margin:0;cursor:pointer;accent-color:var(--accent);}
+.hsb-del{opacity:0.55;font-size:0.9em;cursor:pointer;transition:all .15s;}
+.hsb-del:hover{opacity:1;color:#c06060;}
+.add-section-btn{border-style:dashed;opacity:0.75;}
+.add-section-btn:hover{opacity:1;}
 .home-source-card.soon{opacity:0.45;cursor:default;border-style:dashed;}
 .home-source-card.soon:hover{background:var(--panel);border-color:var(--border);}
 .home-source-card.soon:hover::before{opacity:0;}
@@ -730,8 +770,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 #source-view.r-hidden{display:none;}
 #classes-gallery-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
 .source-hero{max-width:900px;margin:0 auto;padding:50px 24px 10px;text-align:center;}
-.source-home-link{background:transparent;border:none;color:var(--muted);font-family:var(--font);font-size:0.85em;cursor:pointer;margin-bottom:22px;padding:4px 8px;display:inline-flex;align-items:center;gap:6px;transition:color .15s;}
-.source-home-link:hover{color:var(--gold);}
+.source-home-link{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:var(--font);font-size:0.95em;font-weight:600;cursor:pointer;margin-bottom:22px;padding:9px 18px;display:inline-flex;align-items:center;gap:8px;transition:all .15s;border-radius:var(--radius-sm);}
+.source-home-link:hover{border-color:var(--gold);color:var(--gold);}
 .source-title{font-family:var(--font-head);font-size:1.9em;font-weight:700;color:var(--gold2);letter-spacing:0.04em;margin-bottom:10px;}
 .source-desc{font-family:var(--font-body);color:var(--muted);font-size:1.08em;margin-bottom:8px;}
 .source-sections-grid{max-width:900px;margin:26px auto 0;padding:0 24px 60px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
@@ -797,7 +837,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <!-- ═══ СТРАНИЦА ИСТОЧНИКА — landing между Главной и разделами (Классы/Приёмы/...) ═══ -->
 <div id="source-view" class="r-hidden">
   <div class="source-hero">
-    <button class="source-home-link" id="reference-back-btn">← Назад</button>
+    <button class="source-home-link" id="reference-back-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg> Назад</button>
     <h1 class="source-title" id="source-title"></h1>
   </div>
   <div class="source-sections-grid" id="source-sections-grid"></div>
@@ -806,7 +846,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 
 <div id="classes-gallery-view" class="r-hidden">
   <div class="source-hero">
-    <button class="source-home-link" id="gallery-back-btn">← Назад</button>
+    <button class="source-home-link" id="gallery-back-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg> Назад</button>
     <h1 class="source-title" id="gallery-title">Классы</h1>
   </div>
   <div class="home-sources-grid classes-gallery-grid" id="classes-gallery-grid"></div>
@@ -924,7 +964,8 @@ const ICO = {
   exit:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M14 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8"/><path d="M11 12h9m0 0-3-3m3 3-3 3"/></svg>',
   search:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="vertical-align:-2px"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg>',
   palette:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 3a9 8 0 1 0 0 16c1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H16a4 4 0 0 0 4-4c0-4.4-3.6-6-8-6Z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
-  link:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M14 5h5v5"/><path d="M19 5 10 14"/><path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>'
+  link:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M14 5h5v5"/><path d="M19 5 10 14"/><path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+  back:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>'
 };
 firebase.initializeApp(_FB_CONFIG);
 var db = firebase.firestore();
@@ -962,12 +1003,10 @@ const SLOT_DATA={
 let classes=[], activeId=null, dragSrc=null, activeSubId=null, modalMode='class';
 /* ИСТОЧНИКИ (новая навигация Источник→Раздел) */
 let sources=[], currentSourceId=null, editingSourceId=null, editingClassId=null, pendingExpandSourceId=null;
-const SOURCE_SECTIONS=[
-  {id:'classes', label:'Классы'},
-  {id:'maneuvers', label:'Приёмы'},
-  {id:'styles', label:'Черты'},
-  {id:'reference', label:'Справочник'}
-];
+/* Заход 19: фиксированный SOURCE_SECTIONS убран — разделы источника теперь свободные, см.
+   healSourceSections() и renderHome()/renderNavMenu(): source.classesOn/.referenceOn (простые тумблеры)
+   + source.libraries[] (именованные библиотеки компендиума, произвольное количество вместо жёстких 2). */
+let modalTargetSourceId=null; // источник, для которого сейчас открыт modal 'library' (добавление библиотеки)
 const DEFAULT_SOURCES=[
   {id:'laserllama', name:'laserllama', desc:'Альтернативные классы D&D 5e с расширенными механиками и подклассами'}
 ];
@@ -1071,6 +1110,44 @@ function healOrphanCompEntries(){
   const fallback = sources.some(s=>s.id==='laserllama') ? 'laserllama' : (sources[0]?.id||'laserllama');
   let healed=false;
   (COMP.entries||[]).forEach(e=>{ if(!e.sourceId){ e.sourceId=fallback; healed=true; } });
+  if(healed) saveComp();
+}
+
+/* Заход 19: sources[] получили свободные разделы вместо фиксированного SOURCE_SECTIONS — Adam:
+   "должна быть не уже шаблон подставленных а возможность добавлять как библиотека, справочник или
+   классы, и также удалять" + уточнение "отдельно тогл классы и справочник" (эти два — простые
+   тумблеры вкл/выкл, один экземпляр на источник; библиотека — именованная, можно добавить сколько
+   угодно и удалить). Мигрируем ОДНОРАЗОВО: старые источники получают Классы+Справочник включёнными
+   и 2 библиотеки с ТЕМИ ЖЕ id, что раньше были у разделов в hash-путях (styles/maneuvers) — старые
+   ссылки src/<id>/styles и src/<id>/maneuvers остаются рабочими без изменений в routeFromHash().
+   Новый источник (создан ПОСЛЕ этого захода через addSourcePrompt) стартует ПУСТЫМ — см. modalOk(). */
+function healSourceSections(){
+  let healed=false;
+  sources.forEach(s=>{
+    if(!s.libraries){
+      s.classesOn = true;
+      s.referenceOn = true;
+      s.libraries = [
+        { id:'styles', name:'Черты', order:0 },
+        { id:'maneuvers', name:'Приёмы', order:1 }
+      ];
+      healed=true;
+    }
+  });
+  if(healed) saveSources();
+}
+
+/* COMP.categories получили libId (какой библиотеке КАКОГО ИСТОЧНИКА принадлежит категория) взамен
+   старого section:'traits'|'maneuvers', общего на все источники сразу. Реальные категории у Adam
+   есть только в laserllama — безопасно привязываем ВСЕ старые категории к мигрированным библиотекам
+   laserllama (или первого источника, если laserllama почему-то нет), по тому же mapping'у, что и
+   healSourceSections(). Побочный эффект (в плюс): категории де-факто стали per-источник, а не общие —
+   закрывает отдельный архитектурный вопрос, поднятый заходом 17 ("COMP.categories сознательно общие").*/
+function healCompCategoryLibIds(){
+  let healed=false;
+  (COMP.categories||[]).forEach(c=>{
+    if(!c.libId){ c.libId = (c.section==='maneuvers') ? 'maneuvers' : 'styles'; healed=true; }
+  });
   if(healed) saveComp();
 }
 
@@ -1594,9 +1671,19 @@ function modalOk(){
     } else {
       let id=slugify(v1), n=1;
       while(sources.some(s=>s.id===id)){ id=slugify(v1)+'-'+(++n); }
-      sources.push({id, name:v1, desc:v2||'', img:v3||''});
+      // Заход 19: новый источник стартует ПУСТЫМ — без Классов/Справочника/библиотек, Adam
+      // добавляет/включает разделы вручную (раньше подставлялся фиксированный шаблон из 4 разделов).
+      sources.push({id, name:v1, desc:v2||'', img:v3||'', classesOn:false, referenceOn:false, libraries:[]});
     }
     editingSourceId=null; closeModal(); saveSources(); renderHome();
+  } else if(modalMode==='library'){
+    const src=sources.find(x=>x.id===modalTargetSourceId);
+    modalTargetSourceId=null;
+    if(!src){ closeModal(); return; }
+    if(!src.libraries)src.libraries=[];
+    const id='lib_'+Date.now();
+    src.libraries.push({id, name:v1, order:src.libraries.length});
+    closeModal(); saveSources(); renderHome();
   } else if(modalMode==='homelink'){
     if(!v2)return;
     if(editingHomeLinkId){
@@ -1838,44 +1925,70 @@ function autoH(el){ el.style.height='auto'; el.style.height=el.scrollHeight+'px'
 function autoHAll(){ document.querySelectorAll('.attr-val').forEach(autoH); }
 
 /* ABILITIES */
+/* Открытые/закрытые спойлеры уровней — в памяти сессии, не сохраняется в Firestore (заход 19).
+   Ключ "clsId:lv", по умолчанию все уровни свёрнуты. */
+let abGroupOpen={};
 function renderAbilities(cls){
   const subs=cls.subclasses||[];
   const subMap={}; subs.forEach(s=>subMap[s.id]=s);
   const sorted=[...cls.abilities].sort((a,b)=>a.lv-b.lv||(a.id-b.id));
   // фильтр: класс всегда + только выбранный подкласс
   const visible=sorted.filter(a=> !a.subId || a.subId===activeSubId );
-  return visible.map(a=>{
-    const isSubLvAb=a.slvId!=null;
-    const bodyHtml=a.body||'';
-    const sub=a.subId?subMap[a.subId]:null;
-    const sc=sub?.color||null;
-    const borderStyle=sc?`border-left-color:${sc};`:`border-left-color:var(--accent);`;
-    const bgStyle=sc?`background:${sc}0d;`:'';
-    const nameColor=sc?sc:'var(--accent)';
-    const badgeColor=sc?`color:${sc};border-color:${sc}44`:`color:var(--accent);border-color:var(--accent)`;
-    return `<div class="ability-card${a.open?' open':''}" data-id="${a.id}" style="${borderStyle}${bgStyle}">
-      <div class="ability-header" onclick="abHeaderClick(event,${a.id})">
-        <span class="drag-handle" onclick="event.stopPropagation()">⠿</span>
-        <span class="ab-lv-badge" style="${badgeColor}">${a.lv||'—'}</span>
-        <span class="ab-name-wrap">
-          <span class="ab-name-disp" ondblclick="event.stopPropagation();editAbName(this,${a.id})" style="color:${nameColor}">${esc(a.name)}</span>
-          ${isSubLvAb?`<span class="ab-sl-hint-line" style="color:${sc?sc+'88':'var(--accent)'}">${esc(sub?.name||'Подкласс')}</span>`:''}
-        </span>
-        <input class="ab-type-in" value="${esc(a.type)}" placeholder="Тип" oninput="updAb(${a.id},'type',this.value)" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
-        <button class="ab-btn del" onclick="event.stopPropagation();delAb(${a.id})">✕</button>
-        <span class="ab-toggle">▸</span>
+  // группировка по уровню — сохраняем порядок первого появления (visible уже отсортирован по lv)
+  const groups=[]; const byLv={};
+  visible.forEach(a=>{
+    const lv=a.lv||0;
+    if(!byLv[lv]){ byLv[lv]={lv,items:[]}; groups.push(byLv[lv]); }
+    byLv[lv].items.push(a);
+  });
+  return groups.map(g=>{
+    const key=cls.id+':'+g.lv;
+    const isOpen=!!abGroupOpen[key];
+    const itemsHtml=g.items.map(a=>{
+      const isSubLvAb=a.slvId!=null;
+      const bodyHtml=a.body||'';
+      const sub=a.subId?subMap[a.subId]:null;
+      const sc=sub?.color||null;
+      const borderStyle=sc?`border-left-color:${sc};`:`border-left-color:var(--accent);`;
+      const bgStyle=sc?`background:${sc}0d;`:'';
+      const nameColor=sc?sc:'var(--accent)';
+      return `<div class="ability-card${a.open?' open':''}" data-id="${a.id}" style="${borderStyle}${bgStyle}">
+        <div class="ability-header" onclick="abHeaderClick(event,${a.id})">
+          <span class="drag-handle" onclick="event.stopPropagation()">⠿</span>
+          <span class="ab-name-wrap">
+            <span class="ab-name-disp" ondblclick="event.stopPropagation();editAbName(this,${a.id})" style="color:${nameColor}">${esc(a.name)}</span>
+            ${isSubLvAb?`<span class="ab-sl-hint-line" style="color:${sc?sc+'88':'var(--accent)'}">${esc(sub?.name||'Подкласс')}</span>`:''}
+          </span>
+          <input class="ab-type-in" value="${esc(a.type)}" placeholder="Тип" oninput="updAb(${a.id},'type',this.value)" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
+          <button class="ab-btn del" onclick="event.stopPropagation();delAb(${a.id})">✕</button>
+          <span class="ab-toggle">▸</span>
+        </div>
+        <div class="ability-body-wrap">
+          <div class="ab-body-ce" contenteditable="true" data-id="${a.id}"
+            onfocus="activeCeEl=this"
+            onblur="saveCeBody(this,${a.id})"
+            oninput="debounceSaveCe(this,${a.id})"
+            oncontextmenu="showCtxMenu(event,this);event.preventDefault()"
+            onkeydown="ceKeydown(event)"
+          >${bodyHtml}</div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="ab-level-group${isOpen?' open':''}" data-lv-key="${key}">
+      <div class="ab-level-header" onclick="toggleAbLevelGroup(${cls.id},${g.lv})">
+        <span class="ab-level-badge">${g.lv||'—'}</span>
+        <span class="ab-level-title">Уровень ${g.lv||'—'}</span>
+        <span class="ab-level-count">${g.items.length}</span>
+        <span class="ab-level-toggle">▸</span>
       </div>
-      <div class="ability-body-wrap">
-        <div class="ab-body-ce" contenteditable="true" data-id="${a.id}"
-          onfocus="activeCeEl=this"
-          onblur="saveCeBody(this,${a.id})"
-          oninput="debounceSaveCe(this,${a.id})"
-          oncontextmenu="showCtxMenu(event,this);event.preventDefault()"
-          onkeydown="ceKeydown(event)"
-        >${bodyHtml}</div>
-      </div>
+      <div class="ab-level-body">${itemsHtml}</div>
     </div>`;
   }).join('');
+}
+function toggleAbLevelGroup(clsId,lv){
+  const key=clsId+':'+lv;
+  abGroupOpen[key]=!abGroupOpen[key];
+  document.querySelector(`.ab-level-group[data-lv-key="${key}"]`)?.classList.toggle('open');
 }
 
 /* CE body save */
@@ -2112,8 +2225,10 @@ function toggleAb(id){
 function addAbility(){
   const cls=getActive(); if(!cls)return;
   const id=Date.now();
-  cls.abilities.push({id,lv:1,name:'Новое умение',type:'Пассивная',subId:activeSubId,body:'',open:true,slvId:null});
+  const lv=1;
+  cls.abilities.push({id,lv,name:'Новое умение',type:'Пассивная',subId:activeSubId,body:'',open:true,slvId:null});
   syncFeatures(cls); save();
+  abGroupOpen[cls.id+':'+lv]=true;
   const list=document.getElementById('abilities-list');
   if(list){list.innerHTML=renderAbilities(cls);}
   reTable();
@@ -2126,7 +2241,10 @@ function delAb(id){
   const cls=getActive(); if(!cls)return;
   cls.abilities=cls.abilities.filter(a=>a.id!==id);
   syncFeatures(cls); save();
-  document.querySelector(`.ability-card[data-id="${id}"]`)?.remove();
+  // Полный ре-рендер вместо точечного .remove() — границы спойлера уровня
+  // могут измениться, если удалено последнее умение этого уровня (заход 19)
+  const list=document.getElementById('abilities-list');
+  if(list){list.innerHTML=renderAbilities(cls);}
   reTable();
 }
 function reTable(){
@@ -2207,8 +2325,12 @@ function jumpToAbility(abId){
   const cls=getActive(); if(!cls)return;
   const ab=cls.abilities.find(a=>a.id===abId);
   if(!ab)return;
-  // Открываем карточку
-  if(!ab.open){ ab.open=true; save(); const list=document.getElementById('abilities-list'); if(list)list.innerHTML=renderAbilities(cls); }
+  // Открываем карточку и спойлер её уровня (заход 19)
+  const key=cls.id+':'+(ab.lv||0);
+  let needsRerender=false;
+  if(!ab.open){ ab.open=true; save(); needsRerender=true; }
+  if(!abGroupOpen[key]){ abGroupOpen[key]=true; needsRerender=true; }
+  if(needsRerender){ const list=document.getElementById('abilities-list'); if(list)list.innerHTML=renderAbilities(cls); }
   // Скролл + подсветка
   setTimeout(()=>{
     const card=document.querySelector(`.ability-card[data-id="${abId}"]`);
@@ -2248,6 +2370,7 @@ function setupTableDrag(){
     const newLv=parseInt(tr.dataset.lv); const cls=getActive(); if(!cls)return;
     const ab=cls.abilities.find(a=>a.id===tagDragAbId); if(!ab)return;
     ab.lv=newLv; tagDragAbId=null;
+    abGroupOpen[cls.id+':'+newLv]=true;
     syncFeatures(cls); save();
     reTable();
     const list=document.getElementById('abilities-list');
@@ -2691,8 +2814,17 @@ function mobileAbbr(text){
 const SK_COMP = 'guild-comp-v1';
 let COMP = { categories: [], entries: [], nextId: 1 };
 let compView = 'type'; // 'type' | 'name' | 'level'
-let compSection = 'traits'; // 'traits' | 'maneuvers' | null(=все, легаси-доступ) — какая библиотека открыта
-const COMP_SECTION_LABELS = { traits: 'Черты', maneuvers: 'Приёмы' };
+/* Заход 19: compSection (фиксированное 'traits'|'maneuvers') заменён на openLibId — id ЛЮБОЙ библиотеки
+   любого источника (source.libraries[].id), т.к. библиотек теперь может быть произвольное количество
+   с произвольными именами, а не жёстко 2 на весь сайт. null = без фильтра (легаси-доступ, сейчас
+   недостижимо из UI — единственная точка входа #mob-comp-btn была убрана заходом 10). */
+let openLibId = null;
+function currentLibName(){
+  if(!openLibId) return 'Все библиотеки';
+  const src=sources.find(s=>s.id===currentSourceId);
+  const lib=(src?.libraries||[]).find(l=>l.id===openLibId);
+  return lib?lib.name:'';
+}
 let compSearch = '';
 let compFilters = { catId: '', level: '', source: '' };
 let compDragMode = false;
@@ -2701,14 +2833,14 @@ let compDetailEdit = false; // false = view mode, true = edit mode
 let compBodyTimer = null;
 
 const DEFAULT_COMP_CATS = [
-  { id: 'origin',     name: 'Черта происхождения',      icon: '⚙', color: '#5a8a5a', order: 0, section: 'traits' },
-  { id: 'dark',       name: 'Тёмный дар',               icon: '🦇', color: '#7a4aaa', order: 1, section: 'traits' },
-  { id: 'dragonmark', name: 'Черта Драконьей метки',    icon: '✦', color: '#aa6a2a', order: 2, section: 'traits' },
-  { id: 'universal',  name: 'Универсальная черта',       icon: '❋', color: '#3a6aaa', order: 3, section: 'traits' },
-  { id: 'combat',     name: 'Боевой стиль',             icon: '⚔', color: '#aa3a3a', order: 4, section: 'traits' },
-  { id: 'epic',       name: 'Эпический дар',            icon: '✵', color: '#aaaa2a', order: 5, section: 'traits' },
-  { id: 'feat',       name: 'Подвиг',                   icon: '🏆', color: '#3aaa6a', order: 6, section: 'traits' },
-  { id: 'maneuver',   name: 'Приём',                    icon: '⚡', color: '#3a6aaa', order: 7, section: 'maneuvers' },
+  { id: 'origin',     name: 'Черта происхождения',      icon: '⚙', color: '#5a8a5a', order: 0, section: 'traits', libId: 'styles' },
+  { id: 'dark',       name: 'Тёмный дар',               icon: '🦇', color: '#7a4aaa', order: 1, section: 'traits', libId: 'styles' },
+  { id: 'dragonmark', name: 'Черта Драконьей метки',    icon: '✦', color: '#aa6a2a', order: 2, section: 'traits', libId: 'styles' },
+  { id: 'universal',  name: 'Универсальная черта',       icon: '❋', color: '#3a6aaa', order: 3, section: 'traits', libId: 'styles' },
+  { id: 'combat',     name: 'Боевой стиль',             icon: '⚔', color: '#aa3a3a', order: 4, section: 'traits', libId: 'styles' },
+  { id: 'epic',       name: 'Эпический дар',            icon: '✵', color: '#aaaa2a', order: 5, section: 'traits', libId: 'styles' },
+  { id: 'feat',       name: 'Подвиг',                   icon: '🏆', color: '#3aaa6a', order: 6, section: 'traits', libId: 'styles' },
+  { id: 'maneuver',   name: 'Приём',                    icon: '⚡', color: '#3a6aaa', order: 7, section: 'maneuvers', libId: 'maneuvers' },
 ];
 
 async function loadComp() {
@@ -2836,7 +2968,7 @@ function renderCompScreen() {
 
 /* ---------- TOPBAR ---------- */
 function compCatsInSection(){
-  return COMP.categories.filter(c => !compSection || (c.section||'traits')===compSection);
+  return COMP.categories.filter(c => !openLibId || c.libId===openLibId);
 }
 
 function renderCompTopbar() {
@@ -2848,7 +2980,7 @@ function renderCompTopbar() {
   const lvlOpts = `<option value="">Уровень</option>${lvlList.map(v=>`<option value="${v}"${compFilters.level===String(v)?' selected':''}>${v}</option>`).join('')}${hasNull?`<option value="null"${compFilters.level==='null'?' selected':''}>—</option>`:''}`;
   const srcList = [...new Set(COMP.entries.map(e=>e.source||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
   const srcOpts = `<option value="">Источник</option>${srcList.map(s=>`<option value="${esc(s)}"${compFilters.source===s?' selected':''}>${esc(s)}</option>`).join('')}`;
-  const libLabel = compSection ? (COMP_SECTION_LABELS[compSection]||'') : 'Все библиотеки';
+  const libLabel = currentLibName();
   tb.innerHTML = `
     <button class="nav-menu-btn nav-toggle-btn" onclick="toggleNavMenu()" title="Меню навигации">${ICO.menu} Меню</button>
     <span class="comp-lib-title">${esc(libLabel)}</span>
@@ -2882,7 +3014,7 @@ function compFilterEntries() {
   // Заход 17: скоуп по источнику — без этого записи "Приёмов"/"Черт" одного источника (напр. laserllama)
   // были видны и считались во ВСЕХ источниках (Adam поймал это сразу, как только появился 2-й реальный источник).
   if (currentSourceId) list = list.filter(e => (e.sourceId||'laserllama') === currentSourceId);
-  if (compSection) {
+  if (openLibId) {
     const catIds = new Set(compCatsInSection().map(c => c.id));
     list = list.filter(e => catIds.has(e.catId));
   }
@@ -3026,7 +3158,7 @@ function renderCompDetail(id) {
     const metaHtml = metaCells.length ? `<div class="comp-view-meta">${metaCells.map(([l,v])=>`<div class="comp-view-meta-cell"><div class="comp-view-meta-lbl">${esc(l)}</div><div class="comp-view-meta-val">${esc(v)}</div></div>`).join('')}</div>` : '';
     el.innerHTML = `<div class="comp-detail">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-        <button class="comp-detail-back" onclick="compOpenId=null;compDetailEdit=false;renderCompBody()">◀ Назад к списку</button>
+        <button class="comp-detail-back" onclick="compOpenId=null;compDetailEdit=false;renderCompBody()">${ICO.back} Назад к списку</button>
         <button class="comp-edit-btn" style="margin-left:auto" onclick="compDetailEdit=true;renderCompDetail(${id})">✎ Редактировать</button>
       </div>
       <div class="comp-detail-head">
@@ -3048,7 +3180,7 @@ function renderCompDetail(id) {
     const catOpts = cats.map(c => `<option value="${esc(c.id)}"${e.catId===c.id?' selected':''}>${esc(c.icon)} ${esc(c.name)}</option>`).join('');
     el.innerHTML = `<div class="comp-detail">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-        <button class="comp-detail-back" onclick="compOpenId=null;compDetailEdit=false;renderCompBody()">◀ Назад к списку</button>
+        <button class="comp-detail-back" onclick="compOpenId=null;compDetailEdit=false;renderCompBody()">${ICO.back} Назад к списку</button>
         <button class="comp-del-btn" style="margin-left:auto" onclick="compDeleteEntry(${id})">✕ Удалить запись</button>
         <button class="comp-edit-btn" style="border-color:var(--gold);color:var(--gold)" onclick="compDetailEdit=false;renderCompDetail(${id})">✓ Просмотр</button>
       </div>
@@ -3185,7 +3317,7 @@ function toggleCompSettings() {
 function renderCompSettingsPanel() {
   const panel = document.getElementById('comp-settings-panel');
   const cats = compCatsInSection().sort((a,b) => a.order - b.order);
-  const libLabel = compSection ? (COMP_SECTION_LABELS[compSection]||'') : '';
+  const libLabel = openLibId ? currentLibName() : '';
   panel.innerHTML = `
     <div class="comp-sp-head">
       <span class="comp-sp-title">Категории${libLabel?' · '+esc(libLabel):''}</span>
@@ -3213,39 +3345,11 @@ function renderCompSettingsPanel() {
   initCompCatDrag();
 }
 
-// Перенос категории (со всеми её записями) между библиотеками Черты↔Приёмы — отвечает на вопрос
-// Adam "как мигрировать приёмы из черт": категория целиком меняет section, entries внутри неё
-// (COMP.entries[].catId===id) сами по себе никуда не переезжают физически — они просто "следуют"
-// за категорией, т.к. фильтруются по catId→section через compCatsInSection(), отдельного поля
-// section у entries нет и не нужно.
-function compMoveCatSection(id) {
-  const c = COMP.categories.find(x => x.id === id); if (!c) return;
-  const newSection = (c.section === 'maneuvers') ? 'traits' : 'maneuvers';
-  const cnt = COMP.entries.filter(e => e.catId === id).length;
-  if (!confirm(`Перенести категорию «${c.name}»${cnt?` (${cnt} записей)`:''} в библиотеку «${COMP_SECTION_LABELS[newSection]}»?`)) return;
-  c.section = newSection;
-  saveComp();
-  renderCompSettingsPanel(); renderCompTopbar(); renderCompLegend(); renderCompBody();
-}
-
-// Разовая массовая миграция категорий "Приём N-й степени" (и подобных) из "Черты" в "Приёмы" —
-// Adam спросил "может написать скрипт который возьмёт все категории с именами [...] и мигрирует
-// их в библиотеку приёмов?" вместо того чтобы жать кнопку "⇄ Приёмы" по одной штуке. НЕ вызывается
-// из UI (это одноразовая правка старых данных, не постоянная фича) — запускается вручную из
-// консоли браузера (F12 → Console): migrateManeuverCatsByName()
-// По умолчанию ищет категории, чьё название начинается с "Приём"; можно передать другой префикс,
-// например migrateManeuverCatsByName('Заклинание') для другого набора старых категорий.
-function migrateManeuverCatsByName(prefix) {
-  prefix = prefix || 'Приём';
-  const moved = COMP.categories.filter(c => (c.name||'').trim().startsWith(prefix) && c.section !== 'maneuvers');
-  if (!moved.length) { console.log('Ничего не найдено по префиксу «' + prefix + '» (или уже в библиотеке "Приёмы").'); return; }
-  moved.forEach(c => { c.section = 'maneuvers'; });
-  saveComp();
-  renderCompTopbar(); renderCompLegend(); renderCompBody();
-  if (document.getElementById('comp-settings-panel').classList.contains('open')) renderCompSettingsPanel();
-  console.log('Перенесено в "Приёмы" (' + moved.length + '): ' + moved.map(c=>c.name).join(', '));
-}
-
+// compMoveCatSection()/migrateManeuverCatsByName() — консольные хелперы для переноса категорий между
+// ДВУМЯ жёстко зашитыми библиотеками (Черты/Приёмы) — УБРАНЫ заходом 19: сама модель "ровно 2 общие
+// библиотеки" заменена на source.libraries[] (произвольное количество, именованные, per-источник),
+// перенос категории между библиотеками одного/разных источников как консольный хелпер не переносили —
+// если понадобится, писать заново под libId вместо section.
 function compUpdCat(id, field, value) {
   const c = COMP.categories.find(x => x.id === id); if (!c) return;
   c[field] = value; saveComp();
@@ -3263,7 +3367,7 @@ function compDeleteCat(id) {
 function compAddCat() {
   const id = 'cat_' + Date.now();
   const maxOrd = Math.max(-1, ...COMP.categories.map(c => c.order));
-  COMP.categories.push({ id, name: 'Новая категория', icon: '★', color: '#5a6a7a', order: maxOrd + 1, section: compSection || 'traits' });
+  COMP.categories.push({ id, name: 'Новая категория', icon: '★', color: '#5a6a7a', order: maxOrd + 1, libId: openLibId });
   saveComp(); renderCompSettingsPanel(); renderCompTopbar(); renderCompLegend();
 }
 
@@ -3305,9 +3409,12 @@ loadTableFs(); applyTableFs();
 // счётчик не показываем вообще (null), а не "(0)", чтобы не путать с "проверено, пусто".
 function sectionCount(secId, sourceId){
   if (secId === 'classes') return classes.filter(c => (c.category||'') === sourceId).length;
-  if (secId === 'maneuvers' || secId === 'styles') {
-    const section = secId === 'maneuvers' ? 'maneuvers' : 'traits';
-    const catIds = new Set(COMP.categories.filter(c => (c.section||'traits') === section).map(c => c.id));
+  // Заход 19: библиотеки теперь произвольные (source.libraries[]), не жёсткие 'maneuvers'/'styles' —
+  // считаем по libId категории, которая теперь и есть источник правды о принадлежности к источнику.
+  const src = sources.find(s => s.id === sourceId);
+  const lib = (src?.libraries||[]).find(l => l.id === secId);
+  if (lib) {
+    const catIds = new Set(COMP.categories.filter(c => c.libId === secId).map(c => c.id));
     // Заход 17: у Adam появился 2-й реальный источник — записи компендиума теперь скопированы по
     // sourceId (см. healOrphanCompEntries), поэтому считаем только записи ЭТОГО источника, а не все разом.
     return COMP.entries.filter(e => catIds.has(e.catId) && (e.sourceId||'laserllama') === sourceId).length;
@@ -3315,10 +3422,31 @@ function sectionCount(secId, sourceId){
   return null;
 }
 
+/* Заход 19: раздел "Классы"/"Справочник" — простой тумблер вкл/выкл (renderFixedSectionBtn),
+   "Библиотека" — именованная, добавляется/удаляется свободно (renderLibraryBtn + "+ Библиотека"). */
+function renderFixedSectionBtn(s, field, label, secId){
+  const on = !!s[field];
+  const cnt = on ? sectionCount(secId, s.id) : null;
+  if (isOwner) {
+    return `<div class="home-section-btn${on?'':' off'}">
+      <span class="hsb-label" onclick="event.stopPropagation();${on?`location.hash='src/${esc(s.id)}/${secId}'`:''}">${esc(label)}${cnt!=null?` <span class="home-section-count">(${cnt})</span>`:''}</span>
+      <label class="hsb-toggle" onclick="event.stopPropagation()" title="${on?'Скрыть раздел':'Показать раздел'}"><input type="checkbox" ${on?'checked':''} onchange="toggleSourceFixedSection('${esc(s.id)}','${field}',this.checked)"></label>
+    </div>`;
+  }
+  return on ? `<div class="home-section-btn" onclick="event.stopPropagation();location.hash='src/${esc(s.id)}/${secId}'">${esc(label)}${cnt!=null?` <span class="home-section-count">(${cnt})</span>`:''}</div>` : '';
+}
+function renderLibraryBtn(s, lib){
+  const cnt = sectionCount(lib.id, s.id);
+  const delBtn = isOwner ? `<span class="hsb-del" onclick="event.stopPropagation();deleteSourceLibrary('${esc(s.id)}','${esc(lib.id)}')" title="Удалить библиотеку">✕</span>` : '';
+  return `<div class="home-section-btn" onclick="event.stopPropagation();location.hash='src/${esc(s.id)}/${esc(lib.id)}'">${esc(lib.name)}${cnt!=null?` <span class="home-section-count">(${cnt})</span>`:''}${delBtn}</div>`;
+}
 function renderHome(){
   const grid=document.getElementById('home-sources-grid');
   if(!grid || !sources.length) return; // данные ещё не загрузились — статичный фолбэк из HTML остаётся как есть
-  let html = sources.map(s=>`
+  let html = sources.map(s=>{
+    const libs = (s.libraries||[]).slice().sort((a,b)=>(a.order||0)-(b.order||0));
+    const addBtn = isOwner ? `<div class="home-section-btn add-section-btn" onclick="event.stopPropagation();addLibraryPrompt('${esc(s.id)}')">+ Библиотека</div>` : '';
+    return `
     <div class="home-source-card" data-src-id="${esc(s.id)}" draggable="${isOwner?'true':'false'}" onclick="toggleSourceCard('${esc(s.id)}')">
       ${isOwner?`<span class="home-card-drag-h" onclick="event.stopPropagation()" title="Перетащить, чтобы изменить порядок">⠿</span>`:''}
       ${isOwner?`<span class="home-source-edit-btn" onclick="event.stopPropagation();editSourcePrompt('${esc(s.id)}')" title="Редактировать источник">${ICO.gear}</span>`:''}
@@ -3326,18 +3454,34 @@ function renderHome(){
       <div class="home-source-name">${esc(s.name)}</div>
       <div class="home-source-desc">${esc(s.desc||'')}</div>
       <div class="home-source-sections" id="home-src-sections-${esc(s.id)}">
-        ${SOURCE_SECTIONS.map(sec=>{
-          const cnt = sectionCount(sec.id, s.id);
-          return `<div class="home-section-btn" onclick="event.stopPropagation();location.hash='src/${esc(s.id)}/${sec.id}'">${esc(sec.label)}${cnt!=null?` <span class="home-section-count">(${cnt})</span>`:''}</div>`;
-        }).join('')}
+        ${renderFixedSectionBtn(s,'classesOn','Классы','classes')}
+        ${libs.map(l=>renderLibraryBtn(s,l)).join('')}
+        ${renderFixedSectionBtn(s,'referenceOn','Справочник','reference')}
+        ${addBtn}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   html += isOwner
     ? `<div class="home-source-card add-source-card" onclick="addSourcePrompt()"><div class="home-source-name">+ Добавить источник</div></div>`
     : `<div class="home-source-card soon"><div class="home-source-name">Новый источник</div><div class="home-source-desc">Здесь появится следующий переведённый автор</div><div class="home-soon-label">Скоро</div></div>`;
   grid.innerHTML = html;
   renderHomeLinks();
   initHomeSourceDrag();
+}
+function toggleSourceFixedSection(srcId, field, val){
+  const s=sources.find(x=>x.id===srcId); if(!s) return;
+  s[field]=val; saveSources(); renderHome();
+}
+function addLibraryPrompt(srcId){
+  modalTargetSourceId=srcId;
+  openModal('Новая библиотека','Название библиотеки (напр. «Заклинания»)...','','Добавить','library');
+}
+function deleteSourceLibrary(srcId, libId){
+  const src=sources.find(x=>x.id===srcId); if(!src) return;
+  const lib=(src.libraries||[]).find(l=>l.id===libId); if(!lib) return;
+  if(!confirm(`Удалить раздел «${lib.name}» из меню источника? Категории компендиума и их записи внутри НЕ удаляются — просто станут недоступны через это меню.`)) return;
+  src.libraries=(src.libraries||[]).filter(l=>l.id!==libId);
+  saveSources(); renderHome();
 }
 
 /* Drag-переупорядочивание карточек источников на главной (owner-only), заход 16 —
@@ -3399,7 +3543,13 @@ function renderNavMenu(){
   if(currentSourceId){
     const s=sources.find(x=>x.id===currentSourceId);
     html += `<div class="nav-menu-sep"></div><div class="nav-menu-title">${esc(s?s.name:currentSourceId)}</div>`;
-    html += SOURCE_SECTIONS.map(sec=>`<div class="nav-menu-item${activeSection===sec.id?' active':''}" onclick="closeNavMenu();location.hash='src/${esc(currentSourceId)}/${sec.id}'">${esc(sec.label)}</div>`).join('');
+    // Заход 19: список разделов теперь динамический (тумблеры Классы/Справочник + произвольные библиотеки),
+    // не фиксированный SOURCE_SECTIONS — в меню показываем только ВКЛЮЧЁННЫЕ разделы.
+    const items=[];
+    if(s?.classesOn) items.push({id:'classes',label:'Классы'});
+    (s?.libraries||[]).slice().sort((a,b)=>(a.order||0)-(b.order||0)).forEach(l=>items.push({id:l.id,label:l.name}));
+    if(s?.referenceOn) items.push({id:'reference',label:'Справочник'});
+    html += items.map(sec=>`<div class="nav-menu-item${activeSection===sec.id?' active':''}" onclick="closeNavMenu();location.hash='src/${esc(currentSourceId)}/${esc(sec.id)}'">${esc(sec.label)}</div>`).join('');
   }
   links.innerHTML = html;
 }
@@ -3422,8 +3572,15 @@ function routeFromHash(){
   app.classList.add('r-hidden');
   gallery.classList.add('r-hidden');
   const m = h.match(/^src\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/);
-  const wantsCompendium = !!m && (m[2]==='maneuvers' || m[2]==='styles');
-  if (!wantsCompendium && document.body.classList.contains('comp-mode')) closeCompendium(); // сбрасываем "залипший" компендиум при уходе с Приёмов/Боевых стилей
+  // Заход 19: библиотека — произвольная запись source.libraries[], не фиксированный id 'maneuvers'/'styles' —
+  // проверяем совпадение секции хэша с реальным списком библиотек ЭТОГО источника.
+  let wantsCompendium = false, matchedLibId = null;
+  if (m && m[2]) {
+    const src = sources.find(s => s.id === m[1]);
+    const lib = (src?.libraries||[]).find(l => l.id === m[2]);
+    if (lib) { wantsCompendium = true; matchedLibId = lib.id; }
+  }
+  if (!wantsCompendium && document.body.classList.contains('comp-mode')) closeCompendium(); // сбрасываем "залипший" компендиум при уходе с библиотеки
   if (m) {
     const srcId = m[1], section = m[2], subPath = m[3];
     currentSourceId = srcId;
@@ -3439,11 +3596,11 @@ function routeFromHash(){
       renderReferenceView(srcId);
       source.classList.remove('r-hidden');
     } else if (wantsCompendium) {
-      // Приёмы/Боевые стили пока ведут в общий компендиум (без фильтра по источнику — известное ограничение)
+      // Библиотека компендиума этого источника (заход 19: любая из source.libraries[], не только Приёмы/Черты).
       // ВАЖНО: app-view держим скрытым (r-hidden) — #screen-compendium сам разворачивается на весь экран
       // через body.comp-mode CSS. Если снять r-hidden с app-view, оба окажутся видимыми flex-соседями
       // body{display:flex} и поделят экран пополам — именно так выглядел баг, который поймал Adam.
-      compSection = section==='maneuvers' ? 'maneuvers' : 'traits';
+      openLibId = matchedLibId;
       openCompendium();
     } else if (section==='classes' && !subPath) {
       // Галерея классов источника — карточки, клик по карточке открывает класс-билдер (src/<id>/classes/<classId>)
@@ -3492,6 +3649,8 @@ async function _boot() {
   loadCustomThemes(); // данные уже в customThemes из loadConfig()
   healOrphanClassCategories();
   healOrphanCompEntries();
+  healSourceSections();
+  healCompCategoryLibIds();
   if (classes.length > 0) activeId = classes[0].id;
   renderSidebar();
   renderMain();
