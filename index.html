@@ -14,6 +14,21 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-07 (15) — ВИЗУАЛЬНЫЕ ПРАВКИ ПО СЕРИИ СКРИНШОТОВ + ДОРАБОТКА КОНТЕКСТНОГО МЕНЮ РЕДАКТОРА. Заход из серии быстрых сообщений Adam со скриншотами подряд:
+  1) Убрана разовая кнопка миграции категорий компендиума (⇄, compMoveCatSection) — Adam: "эта кнопка миграции была нужна только один раз, поэтому можно убрать". Убран сам элемент `<button class="comp-cat-move-btn">` из `.comp-cat-row2` (renderCompSettingsPanel()) и его CSS, плюс подчищена мёртвая ссылка на класс в гостевом display:none-списке (~строка 1491). Функция `compMoveCatSection(id)` оставлена в коде неиспользуемой (безвредно, устоявшийся паттерн проекта). Консольный инструмент `migrateManeuverCatsByName(prefix)` НЕ трогал — Adam про него не говорил, это другая функция.
+  2) Убрана лишняя точка в заголовке столбца "Ур." таблицы класса → "Ур" (скриншот с обведённой точкой рядом с "БВ").
+  3) Плашки классовых умений в таблице (`.feature-tag`) — Adam: "все одного цвета, как будто надо залитую плашку". Было: прозрачный фон + обводка var(--accent), opacity 0.85 (бледно). Стало: залитый фон rgba(78,122,92,0.16), обводка rgba(78,122,92,0.45), font-weight:700, opacity:1, hover — заливка гуще (0.3). Подклассовые умения (`.sub-tag`, красятся в sub.color инлайном `bg:${sc}1a`) уже были залиты — теперь визуально согласованы с обычными классовыми.
+  4) Карточки умений (`.ability-card`, раздел "УМЕНИЯ") — Adam: "шрифт красивее — именно названий и цифры тоже, рамку тоньше" (2 скриншота, один с красными стрелками на левой рамке). Левая акцентная рамка — 2px→1px. Номер уровня (`.ab-lv-badge`) получил `font-family:var(--font-head)` (Cinzel, тот же что у названия) — раньше цифра и название были в разных шрифтах. Название умения (`.ab-name-disp`) — 1.02em→1.08em, letter-spacing 0.3px→0.5px.
+  5) Кнопки шаблонов кастера ("Полный"/"Полукастер"/"Треть", `.col-tpl-btn`) — Adam: "визуал улучшить и переименовать адекватно". Переименованы в "Полный кастер"/"Полукастер"/"Треть-кастер" (параллельные названия). Визуал: было — блёклая плашка с несочетающимся синевато-серым текстом (#7a9ab8) поверх зелёной обводки; стало — залитый пилюльный стиль (border-radius:var(--radius-pill)) в тон `.feature-tag`/`.home-section-btn` (rgba(78,122,92,0.14) фон, var(--accent) текст, hover гуще + var(--gold2)).
+  6) КОНТЕКСТНОЕ МЕНЮ РЕДАКТОРА ОПИСАНИЙ (`.ab-body-ce`) — Adam: "основательно поработать с контекстным меню, убедиться что всё ок, каждая опция-тогл работает, кнопка убрать форматирование убирает всё, разделить заголовок, скопировать obsidian-функции по форматированию текста, таблицы и таблицы бросков не сломать — допилить под новый дизайн":
+     - "Заголовок" (единственный H3-тогл) РАЗДЕЛЁН на "Заголовок 1/2/3" (`toggleHeading(level)`, formatBlock h1/h2/h3, переключение уровней и снятие повторным кликом). Добавлены стили `.ab-body-ce h1/h2` (h3 уже был) — все три на var(--font-head), разный размер/цвет (h1 крупнее, var(--gold2)).
+     - Добавлены 2 новые obsidian-подобные функции: "Выделение" (`mark`, тот же `wrapSelectionTag()`, что у "Код") и "Цитата" (`blockquote`, `toggleBlockquote()`, тот же паттерн что у заголовков). Новые стили `.ab-body-ce mark/blockquote`.
+     - "Убрать форматирование" (`removeAllFormat`) ПЕРЕПИСАН — старая версия снимала code/heading только если КУРСОР (commonAncestorContainer) был строго внутри тега, что ломалось при выделении сразу нескольких блоков (Ctrl+A / выделение через несколько абзацев — commonAncestorContainer в этом случае оказывается контейнером ВЫШЕ, `.closest()` вниз по потомкам не ищет, заголовок/цитата/список не снимались — подтверждено Playwright-тестом на реальном баге). Теперь функция сканирует все code/mark/h1-h6/blockquote/ul/ol ВНУТРИ редактируемого блока и снимает форматирование с каждого, что пересекается с выделением (`Range.intersectsNode`) — работает одинаково и для курсора в одном месте, и для выделения через несколько абзацев. Списки при снятии разворачиваются в отдельные абзацы (по одному на пункт).
+     - Таблицы (`.ce-table`) и таблицы бросков (`.dice-table`) — функциональность не трогал (вставка/добавление-удаление строки-столбца/удаление/бросок кубика всё так же работают), только визуал: заголовки (th) получили `font-family:var(--font-head)` с letter-spacing, кнопка "🎲 Бросок" — border-radius унифицирован с var(--radius-sm) (было хардкод 2px).
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, qa_ctxmenu.js): все тогл-команды (жирный/курсив/подчёркнутый/зачёркнутый/код/выделение/H1/H2/H3/цитата/список/нумер.список) включаются и корректно выключаются повторным применением; "убрать форматирование" на стопке заголовок+выделение+жирный+курсив+подчёркнутый гарантированно убирает всё (0 тегов форматирования в остатке, текст сохранён); список при снятии разворачивается в текст; таблица — вставка/добавление и удаление строки-столбца/удаление всё подтверждено по факту изменения DOM; таблица бросков — нужное число строк под кость, бросок проставляет результат и подсвечивает строку. Меню открывается по правому клику, все 17 пунктов на месте, иконки не обрезаются (`.ctx-icon` 16px→20px под двухсимвольные "H1/H2/H3"). Ошибок в консоли нет. Прогнан полный регресс по всем более ранним QA-сьютам (11/11b/badges/13/14) — без ошибок (один устаревший сценарий в qa_batch11.js, тестировавший саму убранную кнопку миграции, обновлён — теперь проверяет её отсутствие).
+2026-09-07 (14) — ИЗ ФУТЕРА УБРАНО НАЗВАНИЕ САЙТА. Adam ранее просил ("надпись можно убрать, точнее именно название сайта, а ник оставить и так везде где это есть"), явно попросил не спешить — зафиксировано в бэклоге; теперь подтвердил ("надпись так и не убрал") — сделано. `.home-footer` во всех 3 местах (главная #home-view, страница источника #source-view, галерея классов #classes-gallery-view) — было "© Master Oogway · Гильдия Путеискателей", стало просто "© Master Oogway". Чисто статическая разметка, JS её не перегенерирует — 3 точечные правки текста. Название сайта в заголовке/шапке (.home-title, .action-bar-title, <title>) НЕ трогал — Adam просил убрать только из футера-копирайта.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright): текст футера на всех 3 вьюхах — "© Master Oogway", без остатков "Гильдия Путеискателей". Ошибок в консоли нет.
+  ПОПУТНО: Adam указал, что цифры-счётчики на кнопках разделов главной (заход 13, `.home-section-count`) плохо видны — были `opacity:0.6` унаследованным цветом кнопки, слишком блёкло. Перекрашены в `var(--gold2)` с `font-weight:700`, `opacity:1` — теперь заметно выделяются на плашке ("Классы (2)").
 2026-09-07 (13) — УБРАНА ПРОМЕЖУТОЧНАЯ СТРАНИЦА-ИСТОЧНИК ИЗ FLOW "← НАЗАД", АВТОСЧЁТЧИК ЗАПИСЕЙ НА КНОПКАХ РАЗДЕЛОВ ГЛАВНОЙ.
   1) Adam: "когда мы нажимаем назад из классов нас кидает на промежуточную страницу которую надо убрать она не нужна раз мы сделали менюшку уже на главном экране". Кнопка "← Назад" в галерее классов (`#gallery-back-btn`, `renderGalleryHeader()`) раньше вела на `src/<id>` (#source-view — та самая страница с названием/описанием/Редактировать/Удалить/4 кнопки разделов), которая с захода 11 и так стала недостижима с главной, но оставалась единственным местом, куда ещё вёл этот единственный оставшийся путь. Теперь ведёт сразу на главную (`location.hash=''`), причём карточка того источника, откуда ушли, сразу разворачивается (новый глобал `pendingExpandSourceId`, читается в `routeFromHash()` в ветке home) — так что "назад" ощущается как возврат в то же самое раскрытое меню, а не в свёрнутую главную с лишним кликом. `#source-view` не удалён из кода — по прямой ссылке/URL всё ещё открывается, просто из обычной навигации больше никуда не ведёт.
   2) Автосчётчик записей на кнопках разделов главной (`.home-section-btn`) — Adam ответил на свой же вопрос из захода 11 ("плашки появляются автоматом?"), уточнив что считать: "щас там 2 класса и напротив класса стояло 2 в скобочках". Новая функция `sectionCount(secId, sourceId)`: для 'classes' — реальное число классов источника (`classes.filter(c=>c.category===sourceId)`), для 'maneuvers'/'styles' — число записей соответствующей библиотеки компендиума через существующий `cat.section`. Для 'reference' счётчик не показывается вообще (`null`, не "(0)") — раздел не спроектирован, там физически нет данных для подсчёта. ИЗВЕСТНОЕ ОГРАНИЧЕНИЕ (наследуется от ограничения компендиума): т.к. `COMP.entries` не имеют `sourceId`, счётчики Приёмов/Черт при 2+ источниках будут считать записи ВСЕХ источников разом, а не только текущего — актуально станет при появлении второго реального источника, чинится вместе с тем же ограничением компендиума.
@@ -101,7 +116,7 @@ CHANGELOG (новое сверху):
 - Классы — отдельная страница-галерея (карточки) вместо списка в меню — СДЕЛАНО 2026-09-07(9): src/<id>/classes (галерея) → src/<id>/classes/<classId> (билдер). Список в "Меню" (#nav-menu-classes-block) удалён.
 - Компендиум разделён на 2 независимые библиотеки (Черты/Приёмы) по полю section у категорий — СДЕЛАНО 2026-09-07(9). "Боевые стили" переименованы в "Черты". ОГРАНИЧЕНИЕ ОСТАЁТСЯ: записи всё ещё не фильтруются по источнику (нет sourceId в COMP.entries) — при появлении 2-го реального источника нужно добавить фильтр в обеих библиотеках.
 - Компендиум: 5 колонок — СДЕЛАНО 2026-09-07(8) через честные JS-колонки (compSplitColumns), CSS column-count оказался ненадёжен (схлопывался в одну колонку без явной высоты).
-- Редактор текста: toggle для "Код"/"Заголовок", removeFormat снимает code/heading — СДЕЛАНО 2026-09-07(9) (частично, точечные фиксы). ПОЛНЫЙ РЕДИЗАЙН по мотивам Obsidian (Adam просил "поработай прям основательно... перепиши с нуля") — ЕЩЁ НЕ СДЕЛАНО, отдельный большой проект: нужно сначала обсудить с Adam объём (что именно из возможностей Obsidian переносим — slash-команды, live preview, markdown-source режим и т.д.), сейчас редактор остаётся на contenteditable+execCommand.
+- Редактор текста: контекстное меню форматирования — СДЕЛАНО 2026-09-07(9) точечно, ДОРАБОТАНО 2026-09-07(15) основательно по прямому запросу Adam: заголовок разделён на H1/H2/H3, добавлены "Выделение"(mark)/"Цитата"(blockquote), removeAllFormat переписан на Range.intersectsNode (снимает форматирование надёжно даже при выделении через несколько блоков — старая версия на closest(commonAncestorContainer) в этом случае не срабатывала), таблицы/таблицы бросков визуально подтянуты под новый дизайн (шрифт заголовков). ПОЛНЫЙ РЕДИЗАЙН с нуля по мотивам Obsidian (slash-команды, live preview, markdown-source режим) — по-прежнему НЕ ДЕЛАЛИ, Adam уточнил что имел в виду именно функции форматирования текста, не весь Obsidian целиком; редактор остаётся на contenteditable+execCommand.
 - Переназначение умения другому подклассу после создания — dropdown убран 2026-09-07(9) (Adam счёл лишним), теперь subId выставляется автоматически по активной вкладке подкласса в момент создания; ручного способа переназначить позже нет — если понадобится, добавить отдельно.
 - Мобильные сокращения через синтаксис "Термин (СОКР)" — десктоп/мобайл разный текст
 - Дерево Источник→Раздел — СДЕЛАНО 2026-09-07(6): Главная→источник(#source-view)→раздел(Классы/Приёмы/Черты/Справочник), меню-оверлей слева. Справочник — просто "Скоро", раздел не спроектирован.
@@ -109,7 +124,7 @@ CHANGELOG (новое сверху):
 - Кастомные SVG-иконки вместо эмодзи — СДЕЛАНО (компас 2026-09-07(4), остальные функциональные иконки 2026-09-07(5), шестерёнка перерисована из "солнца" в настоящий cog 2026-09-07(9)). Не тронуты: 📁 в placeholder категории, ⬇⬆✕◀▶⧉✎⠿ (typographic-символы, не цветные эмодзи, уже наследуют var(--muted)/var(--gold) через color), цвета подклассов/категорий компендиума (пользовательские данные).
 - Домашняя страница: карточки источников — СДЕЛАНО 2026-09-07(6). Доп. кнопки-ссылки (Discord и т.п.) — СДЕЛАНО 2026-09-07(7), homeLinks[]/"+ Кнопка".
 - Единая автоматическая палитра классов/подклассов/категорий вместо ручных цветовых пикеров — ЧАСТИЧНО: ручной цвет класса (cls.accentColor/.cls-accent-dot) убран 2026-09-07(9), плашки классовых умений теперь всегда var(--accent). Цвета подклассов (sub.color) и категорий компендиума остаются ручными по прямому запросу Adam (это разные библиотеки/сущности, не тот же кейс).
-- Редизайн .feature-tag (плашки умений в таблице) — СДЕЛАНО 2026-09-07(9) (единый цвет, кроме подклассовых). .ability-card (карточки умений) — ЕЩЁ НЕ СДЕЛАНО.
+- Редизайн .feature-tag (плашки умений в таблице) — СДЕЛАНО 2026-09-07(9) (единый цвет, кроме подклассовых), ДОРАБОТАНО 2026-09-07(15) (залитый фон вместо прозрачной обводки, по запросу "надо залитую плашку"). .ability-card (карточки умений) — СДЕЛАНО 2026-09-07(15): шрифт номера уровня и названия унифицирован на var(--font-head), левая рамка 2px→1px.
 - Домашние "плашки" источников с автоматическим счётчиком записей — СДЕЛАНО 2026-09-07(13): sectionCount(), "Классы (N)"/"Приёмы (N)"/"Черты (N)", у "Справочник" числа нет (нечего считать). ОГРАНИЧЕНИЕ: счётчики Приёмов/Черт общие на все источники (COMP.entries без sourceId), не per-источник.
 - "← Назад" из галереи классов вёл на промежуточную #source-view — СДЕЛАНО 2026-09-07(13): теперь сразу на главную с развёрнутой карточкой источника (pendingExpandSourceId). #source-view остаётся в коде рабочей только по прямой ссылке.
 - Пропавшие классы (cls.category не совпадал с currentSourceId из-за старого ручного поля-папки) — СДЕЛАНО 2026-09-07(11), healOrphanClassCategories() в _boot(). ОГРАНИЧЕНИЕ: работает только если источник ровно один — при 2+ источниках чинить некому (нельзя угадать, какому источнику принадлежит осиротевший класс), нужен отдельный ручной инструмент, когда появится второй реальный источник.
@@ -117,8 +132,10 @@ CHANGELOG (новое сверху):
 - Главная — переход по клику на карточку источника заменён на разворачивание карточки на месте (аккордеон) — СДЕЛАНО 2026-09-07(11), toggleSourceCard()/.expanded. #source-view (страница-источник) осталась в коде рабочей по прямой ссылке, просто с главной больше не достижима.
 - Встраивание ссылок прямо в карточку источника на главной (вместо общей строки homeLinks) — ПОДНЯТО Adam 2026-09-07(11), но САМ ОТЛОЖИЛ ("надо про ссылки придумать") — открытый вопрос, что именно и как встраивать, ждёт его решения. Пока не трогать без нового запроса.
 - Меню-оверлей и модалки открывались рывком (display:none↔block/flex убивал CSS-transition дочерней панели) — СДЕЛАНО 2026-09-07(11), переведены на opacity+pointer-events (см. капкан в разделе "Навигация" памяти).
-- Перенос категорий компендиума между библиотеками Черты↔Приёмы (были заведены не туда при миграции захода 9, т.к. проверялся только id==='maneuver') — СДЕЛАНО 2026-09-07(11): кнопка ⇄ на каждой категории (compMoveCatSection) + разовая консольная massовая функция migrateManeuverCatsByName(prefix) для переноса по префиксу имени.
+- Перенос категорий компендиума между библиотеками Черты↔Приёмы (были заведены не туда при миграции захода 9, т.к. проверялся только id==='maneuver') — СДЕЛАНО 2026-09-07(11): кнопка ⇄ на каждой категории (compMoveCatSection) + разовая консольная massовая функция migrateManeuverCatsByName(prefix) для переноса по префиксу имени. Кнопка ⇄ УБРАНА ИЗ UI 2026-09-07(15) — Adam счёл её нужной только один раз, миграция уже сделана; сама функция compMoveCatSection оставлена в коде неиспользуемой, консольный migrateManeuverCatsByName не трогали.
+- Кнопки шаблонов кастера ("Полный"/"Полукастер"/"Треть") — переименованы и визуально переоформлены в залитый пилюльный стиль 2026-09-07(15): "Полный кастер"/"Полукастер"/"Треть-кастер".
 - Свои картинки-логотипы вместо/вместе с эмодзи для источников/классов/категорий компендиума — СДЕЛАНО 2026-09-07(12): поле img/iconImg, путь к файлу в своём же репозитории, приглушающий CSS-фильтр .site-badge-img. Заодно появилась editClassPrompt() — редактирование названия/описания/картинки существующего класса из галереи, раньше такой возможности не было вообще.
+- Название сайта в футере ("© Master Oogway · Гильдия Путеискателей") — СДЕЛАНО 2026-09-07(14): убрано, остался только ник "© Master Oogway", 3 места (.home-footer). Название сайта в заголовке/шапке (.home-title/.action-bar-title/<title>) не трогали — просилось убрать только из футера-копирайта.
 ═══════════════════════════════════════════════════════════════════════════════ -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -251,10 +268,10 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .lv-input.slot-input{color:var(--accent);}
 .lv-input.slot-input:focus{color:var(--gold2);}
 .feature-tags{display:flex;flex-wrap:wrap;gap:2px;}
-.feature-tag{font-size:0.88em;padding:2px 8px;background:transparent;border:1px solid var(--accent);color:var(--accent);transition:all .15s;white-space:nowrap;font-family:var(--font);opacity:0.85;border-radius:var(--radius-pill);}
-.feature-tag.sub-tag{opacity:0.85;}
+.feature-tag{font-size:0.88em;padding:3px 9px;background:rgba(78,122,92,0.16);border:1px solid rgba(78,122,92,0.45);color:var(--accent);font-weight:600;transition:all .15s;white-space:nowrap;font-family:var(--font);opacity:1;border-radius:var(--radius-pill);}
+.feature-tag.sub-tag{opacity:1;}
 .feature-tag[data-ab-id]{cursor:pointer;}
-.feature-tag[data-ab-id]:hover{background:rgba(78,122,92,0.22);}
+.feature-tag[data-ab-id]:hover{background:rgba(78,122,92,0.3);border-color:var(--accent);}
 .feature-tag[data-ab-id].ft-highlight{box-shadow:0 0 0 2px var(--accent);}
 @keyframes ab-flash{0%{box-shadow:0 0 0 3px var(--accent);}100%{box-shadow:none;}}
 .ab-jump-flash{animation:ab-flash 0.8s ease-out;}
@@ -269,8 +286,8 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .add-col-btn:hover{border-color:var(--gold);color:var(--gold);}
 .tpl-section{margin-top:6px;display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
 .tpl-label{font-size:0.69em;color:var(--muted);letter-spacing:1px;font-weight:700;}
-.col-tpl-btn{padding:4px 9px;border:1px solid rgba(78,122,92,0.28);background:rgba(78,122,92,0.06);color:#7a9ab8;cursor:pointer;font-size:0.69em;letter-spacing:1px;transition:all .15s;font-family:var(--font);}
-.col-tpl-btn:hover{background:rgba(78,122,92,0.16);border-color:rgba(78,122,92,0.5);}
+.col-tpl-btn{padding:5px 12px;border:1px solid rgba(78,122,92,0.4);background:rgba(78,122,92,0.14);color:var(--accent);cursor:pointer;font-size:0.72em;font-weight:600;letter-spacing:0.5px;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
+.col-tpl-btn:hover{background:rgba(78,122,92,0.28);border-color:var(--accent);color:var(--gold2);}
 .col-rh{position:absolute;right:0;top:0;bottom:0;width:4px;cursor:col-resize;background:transparent;}
 .col-rh:hover,.col-rh.active{background:rgba(158,124,50,0.35);}
 
@@ -299,15 +316,15 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 
 /* ABILITIES */
 .abilities-list{display:flex;flex-direction:column;gap:2px;}
-.ability-card{background:var(--panel);border:1px solid var(--border);border-left:2px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.2);}
+.ability-card{background:var(--panel);border:1px solid var(--border);border-left:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.2);}
 .ability-header{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;user-select:none;}
 .ability-header:hover{background:rgba(255,255,255,0.02);}
 .drag-handle{display:none;}
-.ab-lv-badge{font-size:0.9em;color:var(--muted);background:var(--panel2);border:1px solid var(--border);min-width:26px;text-align:center;padding:2px 4px;flex-shrink:0;font-weight:700;}
+.ab-lv-badge{font-family:var(--font-head);font-size:0.95em;color:var(--muted);background:var(--panel2);border:1px solid var(--border);min-width:26px;text-align:center;padding:2px 4px;flex-shrink:0;font-weight:700;letter-spacing:0.4px;}
 .ab-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;margin-left:auto;}
 .ability-card.open .ab-toggle{transform:rotate(90deg);}
 .ab-name-wrap{flex:1;min-width:60px;display:flex;flex-direction:column;gap:1px;overflow:hidden;}
-.ab-name-disp{font-family:var(--font-head);font-size:1.02em;font-weight:600;letter-spacing:0.3px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ab-name-disp{font-family:var(--font-head);font-size:1.08em;font-weight:600;letter-spacing:0.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ab-name-edit{width:100%;background:transparent;border:none;border-bottom:1px solid var(--gold);outline:none;font-size:1em;font-weight:700;color:var(--gold2);font-family:var(--font);}
 .ab-sl-hint-line{font-size:0.69em;color:var(--muted);font-style:italic;line-height:1.2;}
 .ab-type-in{background:transparent;border:none;outline:none;font-size:0.85em;font-style:italic;color:var(--muted);width:150px;font-family:var(--font);cursor:text;}
@@ -326,8 +343,12 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-body-ce p{margin:0 0 2px 0;}
 .ab-body-ce b,.ab-body-ce strong{color:var(--text);}
 .ab-body-ce i,.ab-body-ce em{color:#b8b0a0;}
-.ab-body-ce h3{font-size:1em;color:var(--gold);font-weight:700;margin:6px 0 2px;letter-spacing:1px;}
+.ab-body-ce h1{font-family:var(--font-head);font-size:1.32em;color:var(--gold2);font-weight:700;margin:10px 0 4px;letter-spacing:0.6px;}
+.ab-body-ce h2{font-family:var(--font-head);font-size:1.16em;color:var(--gold);font-weight:700;margin:8px 0 3px;letter-spacing:0.5px;}
+.ab-body-ce h3{font-family:var(--font-head);font-size:1.02em;color:var(--gold);font-weight:700;margin:6px 0 2px;letter-spacing:0.5px;}
 .ab-body-ce code{background:rgba(0,0,0,0.35);padding:1px 5px;font-family:monospace;font-size:0.88em;color:#90c890;}
+.ab-body-ce mark{background:rgba(158,124,50,0.32);color:var(--text);padding:0 2px;border-radius:2px;}
+.ab-body-ce blockquote{border-left:2px solid var(--accent);margin:4px 0;padding:2px 10px;color:var(--muted);font-style:italic;}
 .ab-body-ce ul,.ab-body-ce ol{padding-left:18px;margin:2px 0;}
 .ab-body-ce li{margin:1px 0;}
 .ab-body-ce hr{border:none;border-top:1px solid var(--border);margin:6px 0;}
@@ -335,7 +356,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 /* Tables inside editor */
 .ab-body-ce table.ce-table{border-collapse:collapse;margin:6px 0;width:100%;}
 .ab-body-ce table.ce-table th,.ab-body-ce table.ce-table td{border:1px solid var(--border);padding:4px 8px;vertical-align:top;min-width:30px;}
-.ab-body-ce table.ce-table th{background:var(--panel2);color:var(--gold);font-weight:700;font-size:0.88em;}
+.ab-body-ce table.ce-table th{background:var(--panel2);color:var(--gold);font-weight:700;font-size:0.85em;font-family:var(--font-head);letter-spacing:0.4px;}
 .ab-body-ce table.ce-table td{background:rgba(0,0,0,0.1);}
 .ab-body-ce table.ce-table tr:hover td{background:rgba(255,255,255,0.04);}
 
@@ -345,7 +366,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 @keyframes diceHit{0%{background:rgba(158,124,50,0.5)}100%{background:rgba(158,124,50,0.22)}}
 .ab-body-ce table.dice-table .dice-row-hit td{animation:diceHit 0.35s ease-out forwards;}
 .dice-roll-wrap{display:inline-flex;align-items:center;gap:6px;}
-.dice-roll-btn{display:inline-block;background:rgba(158,124,50,0.12);border:1px solid rgba(158,124,50,0.35);color:var(--gold);padding:1px 7px;cursor:pointer;font-size:0.8em;user-select:none;transition:all .15s;border-radius:2px;}
+.dice-roll-btn{display:inline-block;background:rgba(158,124,50,0.12);border:1px solid rgba(158,124,50,0.35);color:var(--gold);padding:1px 7px;cursor:pointer;font-size:0.8em;user-select:none;transition:all .15s;border-radius:var(--radius-sm);}
 .dice-roll-btn:hover{background:rgba(158,124,50,0.25);border-color:var(--gold);}
 .dice-result-disp{font-size:0.8em;color:var(--gold2);min-width:30px;}
 
@@ -364,7 +385,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ctx-item:hover{background:rgba(158,124,50,0.1);color:var(--gold);}
 .ctx-item.danger:hover{background:rgba(180,60,60,0.12);color:#c06060;}
 .ctx-sep{height:1px;background:var(--border);margin:3px 0;}
-.ctx-icon{width:16px;text-align:center;opacity:0.7;}
+.ctx-icon{width:20px;text-align:center;opacity:0.7;font-size:0.85em;}
 
 .add-ab-btn{margin-top:8px;padding:8px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.77em;letter-spacing:2px;transition:all .15s;width:100%;font-family:var(--font);border-radius:var(--radius-sm);}
 .add-ab-btn:hover{border-color:var(--gold);color:var(--gold);}
@@ -637,8 +658,6 @@ body.comp-mode #screen-compendium{display:flex!important;}
 .comp-cat-name-inp:focus,.comp-cat-icon-inp:focus{border-color:var(--gold);}
 .comp-cat-del-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:0.85em;flex-shrink:0;transition:color .15s;}
 .comp-cat-del-btn:hover{color:#c04444;}
-.comp-cat-move-btn{background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);cursor:pointer;font-size:0.68em;flex-shrink:0;padding:3px 6px;white-space:nowrap;font-family:var(--font);transition:all .15s;}
-.comp-cat-move-btn:hover{color:var(--gold2);border-color:var(--gold);}
 .comp-add-cat-btn{margin:8px;padding:8px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.78em;text-align:center;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .comp-add-cat-btn:hover{border-color:var(--gold);color:var(--gold);}
 
@@ -706,7 +725,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-source-card.expanded .home-source-sections{max-height:200px;opacity:1;margin-top:14px;}
 .home-section-btn{font-size:0.78em;font-family:var(--font);color:var(--accent);background:rgba(78,122,92,0.1);border:1px solid rgba(78,122,92,0.32);border-radius:var(--radius-sm);padding:6px 13px;letter-spacing:0.02em;cursor:pointer;transition:all .15s;}
 .home-section-btn:hover{border-color:var(--accent);background:rgba(78,122,92,0.22);color:var(--gold2);}
-.home-section-count{opacity:0.6;font-size:0.92em;}
+.home-section-count{color:var(--gold2);font-weight:700;font-size:0.95em;opacity:1;}
 .home-source-card.soon{opacity:0.45;cursor:default;border-style:dashed;}
 .home-source-card.soon:hover{background:var(--panel);border-color:var(--border);}
 .home-source-card.soon:hover::before{opacity:0;}
@@ -802,7 +821,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
       </div>
     </div>
   </div>
-  <div class="home-footer">© Master Oogway · Гильдия Путеискателей</div>
+  <div class="home-footer">© Master Oogway</div>
 </div>
 
 <!-- ═══ СТРАНИЦА ИСТОЧНИКА — landing между Главной и разделами (Классы/Приёмы/...) ═══ -->
@@ -814,7 +833,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     <div id="source-edit-wrap" style="display:flex;gap:8px;justify-content:center;margin-top:10px;"></div>
   </div>
   <div class="source-sections-grid" id="source-sections-grid"></div>
-  <div class="home-footer">© Master Oogway · Гильдия Путеискателей</div>
+  <div class="home-footer">© Master Oogway</div>
 </div>
 
 <div id="classes-gallery-view" class="r-hidden">
@@ -823,7 +842,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     <h1 class="source-title" id="gallery-title">Классы</h1>
   </div>
   <div class="home-sources-grid classes-gallery-grid" id="classes-gallery-grid"></div>
-  <div class="home-footer">© Master Oogway · Гильдия Путеискателей</div>
+  <div class="home-footer">© Master Oogway</div>
 </div>
 
 <!-- ═══ ОВЕРЛЕЙ НАВИГАЦИОННОГО МЕНЮ — единая точка навигации (Главная/разделы/список классов), не влияет на разметку страницы под собой ═══ -->
@@ -1486,7 +1505,7 @@ function applyROMode() {
     '.tpl-section{display:none!important;}' +
     /* compendium */
     '.comp-toggle-drag-btn,.comp-drag-btn,.comp-edit-btn{display:none!important;}' +
-    '.comp-add-btn,.comp-settings-btn,.comp-export-btn,.comp-add-cat-btn,.comp-cat-del-btn,.comp-cat-move-btn,.comp-cat-drag-h{display:none!important;}' +
+    '.comp-add-btn,.comp-settings-btn,.comp-export-btn,.comp-add-cat-btn,.comp-cat-del-btn,.comp-cat-drag-h{display:none!important;}' +
     /* remaining inputs/textareas */
     'input:not(.comp-search-inp):not(.comp-filter-inp),textarea,select:not(.comp-filter-sel){pointer-events:none!important;cursor:default!important;}' +
     '.comp-search-inp,.comp-filter-inp,.comp-filter-sel{pointer-events:auto!important;}';
@@ -1858,7 +1877,7 @@ function renderTable(cls){
       ).join('')}
     </tr>`:''}
     <tr>
-      <th data-col="lv" ${colW(cls,'lv',30)}>Ур.${rh}</th>
+      <th data-col="lv" ${colW(cls,'lv',30)}>Ур${rh}</th>
       <th data-col="prof" ${colW(cls,'prof',36)}>БВ${rh}</th>
       <th data-col="features" style="width:${cw['features']||180}px">Классовые умения${rh}</th>
       ${normalCols.map(c=>`<th data-col="${c.id}" ${colW(cls,c.id,70)} draggable="true" title="${esc(c.name)}"><div class="col-hdr-inner"><span class="col-drag-handle">⠿</span><span class="col-hdr-name" ondblclick="renameCol('${c.id}',this)">${esc(mobileAbbr(c.name))}</span><span class="del-col-btn" onclick="delCol('${c.id}')">✕</span></div>${rh}</th>`).join('')}
@@ -2049,7 +2068,7 @@ function renderSubEditor(cls,sub){
       <span style="font-size:0.7em;color:var(--muted);margin-right:2px;">Заклинания подкласса:</span>
       ${(cls.customCols||[]).some(c=>c.subId===sub.id)
         ? `<button class="tiny-btn del" onclick="delSubSpells(${sub.id})">✕ Убрать</button>`
-        : `<button class="col-tpl-btn" onclick="applySubSlotTemplate('full',${sub.id})">Полный</button><button class="col-tpl-btn" onclick="applySubSlotTemplate('half',${sub.id})">Полукастер</button><button class="col-tpl-btn" onclick="applySubSlotTemplate('third',${sub.id})">Треть</button>`}
+        : `<button class="col-tpl-btn" onclick="applySubSlotTemplate('full',${sub.id})">Полный кастер</button><button class="col-tpl-btn" onclick="applySubSlotTemplate('half',${sub.id})">Полукастер</button><button class="col-tpl-btn" onclick="applySubSlotTemplate('third',${sub.id})">Треть-кастер</button>`}
     </div>
   </div>`;
 }
@@ -2157,9 +2176,9 @@ function renderMain(){
       </div>
       <div class="tpl-section">
         <span class="tpl-label">Шаблоны кастера:</span>
-        <button class="col-tpl-btn" onclick="applySlotTemplate('full')">Полный</button>
+        <button class="col-tpl-btn" onclick="applySlotTemplate('full')">Полный кастер</button>
         <button class="col-tpl-btn" onclick="applySlotTemplate('half')">Полукастер</button>
-        <button class="col-tpl-btn" onclick="applySlotTemplate('third')">Треть</button>
+        <button class="col-tpl-btn" onclick="applySlotTemplate('third')">Треть-кастер</button>
       </div>
     </div>
     <!-- Мобильный блок атрибутов (между таблицей и умениями, скрыт на десктопе) -->
@@ -2431,9 +2450,16 @@ function wrapSelectionTag(tag){
   const ce=el.closest('.ab-body-ce'); if(ce){ const id=parseInt(ce.dataset.id); saveCeBody(ce,id); }
 }
 
-function toggleHeading(){
+function toggleHeading(level){
+  const tag='h'+(level||3);
   const cur=(document.queryCommandValue('formatBlock')||'').toLowerCase();
-  document.execCommand('formatBlock',false,cur==='h3'?'p':'h3');
+  document.execCommand('formatBlock',false,cur===tag?'p':tag);
+  saveCeIfActive();
+}
+
+function toggleBlockquote(){
+  const cur=(document.queryCommandValue('formatBlock')||'').toLowerCase();
+  document.execCommand('formatBlock',false,cur==='blockquote'?'p':'blockquote');
   saveCeIfActive();
 }
 
@@ -2441,12 +2467,36 @@ function removeAllFormat(){
   document.execCommand('removeFormat',false,null);
   const sel=window.getSelection();
   if(sel&&sel.rangeCount){
-    let node=sel.getRangeAt(0).commonAncestorContainer;
+    const range=sel.getRangeAt(0);
+    let node=range.commonAncestorContainer;
     if(node.nodeType!==1) node=node.parentElement;
-    const codeAnc=node?node.closest('code'):null;
-    if(codeAnc){ const p=codeAnc.parentNode; while(codeAnc.firstChild)p.insertBefore(codeAnc.firstChild,codeAnc); p.removeChild(codeAnc); }
-    const headAnc=node?node.closest('h1,h2,h3,h4,h5,h6'):null;
-    if(headAnc) document.execCommand('formatBlock',false,'p');
+    const scope=(node&&node.closest('.ab-body-ce'))||activeCeEl;
+    if(scope){
+      // Scan the whole editable box and unwrap anything the selection touches —
+      // works whether the selection is a caret in one block or spans several
+      // (commonAncestorContainer alone isn't reliable for the multi-block case).
+      scope.querySelectorAll('code,mark').forEach(el=>{
+        if(range.intersectsNode(el)){ const p=el.parentNode; while(el.firstChild)p.insertBefore(el.firstChild,el); p.removeChild(el); }
+      });
+      scope.querySelectorAll('h1,h2,h3,h4,h5,h6,blockquote').forEach(el=>{
+        if(range.intersectsNode(el)){
+          const p=document.createElement('p');
+          while(el.firstChild) p.appendChild(el.firstChild);
+          el.replaceWith(p);
+        }
+      });
+      scope.querySelectorAll('ul,ol').forEach(list=>{
+        if(range.intersectsNode(list)){
+          const frag=document.createDocumentFragment();
+          list.querySelectorAll(':scope > li').forEach(li=>{
+            const p=document.createElement('p');
+            while(li.firstChild) p.appendChild(li.firstChild);
+            frag.appendChild(p);
+          });
+          list.replaceWith(frag);
+        }
+      });
+    }
   }
   saveCeIfActive();
 }
@@ -2510,8 +2560,12 @@ function showCtxMenu(e,el){
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('underline')"><span class="ctx-icon"><u>U</u></span>Подчёркнутый</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('strikeThrough')"><span class="ctx-icon"><s>S</s></span>Зачёркнутый</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('code')"><span class="ctx-icon">⌨</span>Код</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('mark')"><span class="ctx-icon">🖍</span>Выделение</div>`;
   html+=`<div class="ctx-sep"></div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading()"><span class="ctx-icon">H</span>Заголовок</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(1)"><span class="ctx-icon">H1</span>Заголовок 1</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(2)"><span class="ctx-icon">H2</span>Заголовок 2</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(3)"><span class="ctx-icon">H3</span>Заголовок 3</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleBlockquote()"><span class="ctx-icon">❝</span>Цитата</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertUnorderedList')"><span class="ctx-icon">≡</span>Список</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertOrderedList')"><span class="ctx-icon">①</span>Нумер. список</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();insertCeHr()"><span class="ctx-icon">—</span>Разделитель</div>`;
@@ -3274,7 +3328,6 @@ function renderCompSettingsPanel() {
           <div class="comp-cat-row2">
             ${c.iconImg ? `<img class="comp-cat-img-preview" src="${esc(c.iconImg)}" alt="">` : ''}
             <input class="comp-cat-img-inp" value="${esc(c.iconImg||'')}" placeholder="путь к картинке, напр. icons/combat.png" title="Путь/URL своей картинки-иконки — если задано, заменяет эмодзи" oninput="compUpdCat('${esc(c.id)}','iconImg',this.value)">
-            <button class="comp-cat-move-btn" onclick="compMoveCatSection('${esc(c.id)}')" title="Перенести в «${esc(COMP_SECTION_LABELS[(c.section==='maneuvers')?'traits':'maneuvers'])}»">⇄ ${esc(COMP_SECTION_LABELS[(c.section==='maneuvers')?'traits':'maneuvers'])}</button>
           </div>
         </div>
       `).join('')}
