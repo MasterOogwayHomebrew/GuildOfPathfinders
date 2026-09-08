@@ -14,6 +14,10 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-08 (16) — DRAG-ПЕРЕУПОРЯДОЧИВАНИЕ КАРТОЧЕК ИСТОЧНИКОВ НА ГЛАВНОЙ И КЛАССОВ В ГАЛЕРЕЕ. Adam: "теперь мне надо чтобы я мог перетаскивать... назначать порядок блокам в главном меню и в классах". До этого порядок карточек = порядок элементов в массиве `sources[]`/`classes[]` (как загрузились из Firestore/как создавались), никакого способа поменять его не было. Реализовано тем же паттерном, что уже использовался для колонок таблицы класса (`headerDragColId`) и категорий компендиума (`compMoveCatSection`/`initCompCatDrag`) — HTML5 drag-and-drop, `draggable="true"` на всю карточку (owner-only), маленький визуальный хэндл "⠿" (`.home-card-drag-h`, левый верхний угол, вторая сторона от ⚙-редактирования) — только для affordance, начать перетаскивание можно с любой точки карточки, т.к. интерактивные элементы (⚙/✕/клик-открытие) внутри draggable-контейнера уже давно сосуществуют без конфликтов (тот же `.comp-cat-item`). На drop — не отдельное поле `order`, а прямой `splice()` в самом массиве (перенос перетащенного элемента на позицию цели), т.к. `sources[]`/`classes[]` — плоские массивы без order-поля, в отличие от `COMP.categories`.
+  1) Источники на главной (`initHomeSourceDrag()`, вызывается из `renderHome()`) — двигает элемент в `sources[]` по id, сохраняет через `saveSources()`, полный ре-рендер `renderHome()`.
+  2) Классы в галерее (`initClassGalleryDrag()`, вызывается из `renderSidebar()`) — двигает элемент в `classes[]` по id (общий массив на все источники — переставляются только видимые в текущей галерее карточки, относительный порядок классов ДРУГИХ источников не трогается, т.к. splice ищет позицию цели в полном массиве), сохраняет через `save()`.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, симуляция настоящих DragEvent с DataTransfer, т.к. page.dragAndDrop через мышь ненадёжен в headless для кастомных обработчиков): перетаскивание 3-й карточки источника на 1-ю — реальный порядок в `sources[]` И в DOM меняется корректно; то же для классов в галерее (перетаскивание id=3 на id=1 → [3,1,2]); клик-открытие/клик-разворачивание карточек по-прежнему работает как раньше (draggable="true" не сломал ни один из существующих onclick). Ошибок в консоли нет.
 2026-09-07 (15) — ВИЗУАЛЬНЫЕ ПРАВКИ ПО СЕРИИ СКРИНШОТОВ + ДОРАБОТКА КОНТЕКСТНОГО МЕНЮ РЕДАКТОРА. Заход из серии быстрых сообщений Adam со скриншотами подряд:
   1) Убрана разовая кнопка миграции категорий компендиума (⇄, compMoveCatSection) — Adam: "эта кнопка миграции была нужна только один раз, поэтому можно убрать". Убран сам элемент `<button class="comp-cat-move-btn">` из `.comp-cat-row2` (renderCompSettingsPanel()) и его CSS, плюс подчищена мёртвая ссылка на класс в гостевом display:none-списке (~строка 1491). Функция `compMoveCatSection(id)` оставлена в коде неиспользуемой (безвредно, устоявшийся паттерн проекта). Консольный инструмент `migrateManeuverCatsByName(prefix)` НЕ трогал — Adam про него не говорил, это другая функция.
   2) Убрана лишняя точка в заголовке столбца "Ур." таблицы класса → "Ур" (скриншот с обведённой точкой рядом с "БВ").
@@ -136,6 +140,7 @@ CHANGELOG (новое сверху):
 - Кнопки шаблонов кастера ("Полный"/"Полукастер"/"Треть") — переименованы и визуально переоформлены в залитый пилюльный стиль 2026-09-07(15): "Полный кастер"/"Полукастер"/"Треть-кастер".
 - Свои картинки-логотипы вместо/вместе с эмодзи для источников/классов/категорий компендиума — СДЕЛАНО 2026-09-07(12): поле img/iconImg, путь к файлу в своём же репозитории, приглушающий CSS-фильтр .site-badge-img. Заодно появилась editClassPrompt() — редактирование названия/описания/картинки существующего класса из галереи, раньше такой возможности не было вообще.
 - Название сайта в футере ("© Master Oogway · Гильдия Путеискателей") — СДЕЛАНО 2026-09-07(14): убрано, остался только ник "© Master Oogway", 3 места (.home-footer). Название сайта в заголовке/шапке (.home-title/.action-bar-title/<title>) не трогали — просилось убрать только из футера-копирайта.
+- Перетаскивание карточек источников на главной и классов в галерее для ручного порядка — СДЕЛАНО 2026-09-08(16): drag-and-drop (initHomeSourceDrag/initClassGalleryDrag), splice в sources[]/classes[] по id, owner-only, хэндл "⠿" слева сверху карточки.
 ═══════════════════════════════════════════════════════════════════════════════ -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -732,6 +737,9 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-soon-label{font-size:0.68em;font-family:var(--font);letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 8px;}
 .home-footer{text-align:center;padding:16px;font-size:0.72em;color:var(--muted);opacity:0.6;letter-spacing:0.05em;}
 .home-source-edit-btn{position:absolute;top:14px;right:14px;color:var(--muted);opacity:0.6;transition:opacity .15s,color .15s;z-index:2;}
+.home-card-drag-h{position:absolute;top:14px;left:14px;color:var(--muted);opacity:0.3;font-size:0.9em;cursor:grab;z-index:2;transition:opacity .15s;}
+.home-source-card:hover .home-card-drag-h{opacity:0.65;}
+.home-source-card.drag-over{border-color:var(--gold);background:var(--panel2);}
 .home-source-edit-btn:hover{opacity:1;color:var(--gold);}
 .home-source-card.add-source-card{border-style:dashed;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-height:96px;}
 .home-source-card.add-source-card .home-source-name{color:var(--muted);}
@@ -1542,7 +1550,8 @@ function syncFeatures(cls){
 
 /* CLASSES GALLERY RENDER (заменяет собой бывший постоянный сайдбар и список в меню — см. renderClassesGallery ниже) */
 function renderClassCard(c){
-  return `<div class="home-source-card class-gallery-card" data-cls-id="${c.id}" onclick="openClassCard(${c.id})">
+  return `<div class="home-source-card class-gallery-card" data-cls-id="${c.id}" draggable="${isOwner?'true':'false'}" onclick="openClassCard(${c.id})">
+    ${isOwner?`<span class="home-card-drag-h" onclick="event.stopPropagation()" title="Перетащить, чтобы изменить порядок">⠿</span>`:''}
     ${isOwner?`<span class="class-gallery-edit-btn" onclick="event.stopPropagation();editClassPrompt(${c.id})" title="Редактировать класс">${ICO.gear}</span>`:''}
     ${isOwner?`<span class="class-gallery-del" onclick="event.stopPropagation();deleteClass(${c.id})" title="Удалить класс">✕</span>`:''}
     ${c.img?`<img class="home-source-badge site-badge-img" src="${esc(c.img)}" alt="">`:''}
@@ -1566,6 +1575,34 @@ function renderSidebar(){
   if(isOwner) html+=`<div class="home-source-card add-source-card" onclick="addClassPrompt()"><div class="home-source-name">+ Добавить класс</div></div>`;
   const grid=document.getElementById('classes-gallery-grid');
   if(grid) grid.innerHTML=html;
+  initClassGalleryDrag();
+}
+
+/* Drag-переупорядочивание карточек классов в галерее (owner-only), заход 16 — splice в classes[]
+   по id (массив общий на все источники, но переставляются только видимые в текущей галерее карточки,
+   остальные классы в массиве не трогаются — их относительный порядок не меняется). */
+function initClassGalleryDrag(){
+  if(!isOwner) return;
+  const grid=document.getElementById('classes-gallery-grid'); if(!grid) return;
+  let dragId=null;
+  grid.querySelectorAll('.class-gallery-card[data-cls-id]').forEach(el=>{
+    const id=parseInt(el.dataset.clsId);
+    el.addEventListener('dragstart',e=>{ dragId=id; e.dataTransfer.effectAllowed='move'; setTimeout(()=>el.style.opacity='0.4',0); });
+    el.addEventListener('dragend',()=>{ dragId=null; el.style.opacity=''; grid.querySelectorAll('.class-gallery-card.drag-over').forEach(x=>x.classList.remove('drag-over')); });
+    el.addEventListener('dragover',e=>{ e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
+    el.addEventListener('drop',e=>{
+      e.preventDefault(); el.classList.remove('drag-over');
+      const tgtId=id;
+      if(dragId==null||dragId===tgtId) return;
+      const srcIdx=classes.findIndex(c=>c.id===dragId);
+      if(srcIdx<0) return;
+      const [moved]=classes.splice(srcIdx,1);
+      const tgtIdx=classes.findIndex(c=>c.id===tgtId);
+      classes.splice(tgtIdx,0,moved);
+      save(); renderSidebar();
+    });
+  });
 }
 
 function toggleCat(cat){
@@ -3441,7 +3478,8 @@ function renderHome(){
   const grid=document.getElementById('home-sources-grid');
   if(!grid || !sources.length) return; // данные ещё не загрузились — статичный фолбэк из HTML остаётся как есть
   let html = sources.map(s=>`
-    <div class="home-source-card" data-src-id="${esc(s.id)}" onclick="toggleSourceCard('${esc(s.id)}')">
+    <div class="home-source-card" data-src-id="${esc(s.id)}" draggable="${isOwner?'true':'false'}" onclick="toggleSourceCard('${esc(s.id)}')">
+      ${isOwner?`<span class="home-card-drag-h" onclick="event.stopPropagation()" title="Перетащить, чтобы изменить порядок">⠿</span>`:''}
       ${isOwner?`<span class="home-source-edit-btn" onclick="event.stopPropagation();editSourcePrompt('${esc(s.id)}')" title="Редактировать источник">${ICO.gear}</span>`:''}
       ${s.img?`<img class="home-source-badge site-badge-img" src="${esc(s.img)}" alt="">`:''}
       <div class="home-source-name">${esc(s.name)}</div>
@@ -3458,6 +3496,33 @@ function renderHome(){
     : `<div class="home-source-card soon"><div class="home-source-name">Новый источник</div><div class="home-source-desc">Здесь появится следующий переведённый автор</div><div class="home-soon-label">Скоро</div></div>`;
   grid.innerHTML = html;
   renderHomeLinks();
+  initHomeSourceDrag();
+}
+
+/* Drag-переупорядочивание карточек источников на главной (owner-only), заход 16 —
+   тот же паттерн, что и у compMoveCatSection/customCols: splice дотащенного элемента
+   в новую позицию в самом массиве sources[], без отдельного поля order. */
+function initHomeSourceDrag(){
+  if(!isOwner) return;
+  const grid=document.getElementById('home-sources-grid'); if(!grid) return;
+  let dragId=null;
+  grid.querySelectorAll('.home-source-card[data-src-id]').forEach(el=>{
+    el.addEventListener('dragstart',e=>{ dragId=el.dataset.srcId; e.dataTransfer.effectAllowed='move'; setTimeout(()=>el.style.opacity='0.4',0); });
+    el.addEventListener('dragend',()=>{ dragId=null; el.style.opacity=''; grid.querySelectorAll('.home-source-card.drag-over').forEach(x=>x.classList.remove('drag-over')); });
+    el.addEventListener('dragover',e=>{ e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
+    el.addEventListener('drop',e=>{
+      e.preventDefault(); el.classList.remove('drag-over');
+      const tgtId=el.dataset.srcId;
+      if(!dragId||dragId===tgtId) return;
+      const srcIdx=sources.findIndex(s=>s.id===dragId);
+      if(srcIdx<0) return;
+      const [moved]=sources.splice(srcIdx,1);
+      const tgtIdx=sources.findIndex(s=>s.id===tgtId);
+      sources.splice(tgtIdx,0,moved);
+      saveSources(); renderHome();
+    });
+  });
 }
 
 /* Клик по карточке источника на главной больше не уводит на отдельную страницу (#source-view) —
