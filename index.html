@@ -14,6 +14,31 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-08 (18) — СЕРИЯ МЕЛКИХ ПРАВОК ПО СКРИНШОТАМ + ДЕФОЛТЫ ЧИТАТЕЛЯ + ПРОХОД ПО МЁРТВОМУ КОДУ.
+  1) Плашки подклассов (`.sub-tab`) — Adam: "с плашками подклассов тоже такую же заполненную текстуру как в таблице но не забываем оставить или модифицировать обновить выдачу цвета". Раньше: прозрачный фон, только цветная обводка+текст (`sc`) инлайном, залитый фон (`${sc}18`) был только у АКТИВНОГО таба. Стало: залитый фон у ВСЕХ табов с цветом (`${sc}29` ~16% альфы в покое, `${sc}4d` ~30% у активного — те же альфа-хексы, что у `.feature-tag` в таблице, 0x29/0x45→округлено до `4d` для чуть более явного "выбрано"), цвет текста/обводки (`sc`) сохранён как был — просто добавлена заливка поверх, ничего не потеряно. Дефолтный `.sub-tab` (без цвета/без назначенного подкласса) тоже перекрашен в заливку var(--accent) вместо бледно-белого — для единообразия с остальными "заполненными" пилюлями сайта.
+  2) Объединение "Атрибуты" + "Ключевые атрибуты · <Класс>" в один заголовок — Adam: "вот тут тоже вот эти два объединить в одно как я говорил про умения тут сделать тоже самое" (по аналогии с "Умения"→"Классовые умения" из захода 17). Убран отдельный маленький `<div class="section-title">Атрибуты</div>` перед блоком атрибутов; `.attr-title` (тот самый "Ключевые атрибуты · <Класс>" внутри `renderAttrPanel()`) переоформлен в том же стиле, что `.abilities-title`: 1.15em, font-head (Cinzel), var(--gold2), без uppercase/letter-spacing. Теперь один заголовок вместо двух. Заодно замечен и убран целый МЁРТВЫЙ узел разметки — правый десктопный сайдбар атрибутов (`.content-right`/`.right-toggle-bar`/`renderAttrPanel()` дублировался туда же) — см. п.5.
+  3) Шрифт описания карточек (класс/источник) "растворяется на глазах" — Adam про декоративный курсивный шрифт цитат класса на карточках галереи. Причина: `.home-source-desc` рендерился на `--font-body` (Cormorant Garamond, тонкий декоративный serif) — на мелком кегле и тёмном фоне тонкие засечки визуально "дрожат"/теряют чёткость при рендере браузера. Заменён на `var(--font)` (тот же санс-сериф, что весь остальной UI), кегль слегка уменьшен (1em→0.93em) для баланса. Затрагивает оба места использования `.home-source-desc` (карточки источников на главной И карточки классов в галерее) — оба получают более чёткий, легко читаемый текст.
+  4) Дефолтные настройки интерфейса/текста для ЧИТАТЕЛЕЙ (не владельца) — Adam подобрал в своей панели настроек комфортные значения (Шрифт UI 17px, Масштаб 100%, Шрифт таблицы 125%) и попросил сделать их дефолтом для всех новых посетителей (у него самого эти значения уже осели в localStorage браузера с предыдущих правок вручную через ⚙). Значения — per-visitor, хранятся в localStorage каждого браузера (`guild-cls-fs`/`guild-cls-scale`/`guild-cls-tfs`), НЕ в Firestore — т.е. это не общий "дефолт сайта", а стартовые значения ТОЛЬКО для тех, у кого ещё нет своих сохранённых настроек (первый визит / очищенный кэш). Изменены хардкод-дефолты: `uiFontSize` 13→17, `uiTableFontSize` 0.85→1.25 (`uiScale` уже был 1.0=100%, не менялся) + синхронизированы дефолтные CSS-переменные `--ui-fs`/`--table-fs` в `:root` (17px/1.25em) — они действуют как самый первый рендер до того, как JS успеет применить `applyFontSize()`/`applyTableFs()`.
+  5) ПРОХОД ПО МЁРТВОМУ КОДУ — Adam явно попросил "прогнать разок на проверку ошибок и исправлений а также на не нужный или мертвый код". Систематически проверил каждую функцию верхнего уровня на реальные вызовы (grep по всему файлу) и убрал ПОДТВЕРЖДЁННО мёртвое (0 обращений нигде, кроме собственного определения):
+    • `deleteCustomTheme()`, `loadTheme()` — обработчик удаления кастомной темы, для которой в разметке никогда не было кнопки (сам `addCustomTheme()`/`changeThemeVar()`/`resetTheme()`/`applyPreset()` НАМЕРЕННО оставлены нетронутыми — это уже задокументированное с прошлых заходов решение: весь блок "Темы/Палитра" вырезан из UI, но JS оставлен на случай ручной правки cfg.themeVars через консоль); `loadTheme()` — легаси-загрузка темы из localStorage, давно заменена на `loadConfig()`/Firestore.
+    • `updateClassAccent()` — обработчик ручного цвет-пикера класса (`.cls-accent-dot`), сам пикер убран из разметки ещё в заходе 9.
+    • `toggleSort()`, `getCeTable()` — ни разу не вызывались нигде (сортировка в галерее классов управляется напрямую через `sortAlpha`/`renderSidebar()` без отдельной кнопки-тумблера; `getCeTable()` — недописанная утилита для таблиц в contenteditable, не подключена).
+    • ЦЕЛАЯ мёртвая подсистема — старый сайдбар классов с папками-категориями (`#class-list`/`.cat-header`/`.cat-folder`/`.class-item*`/`.sb-search-inp`/`.sb-sort-btn`/`.add-class-btn`/`.sidebar-author`, JS `toggleCat()`/`renameCatInline()`/`initSidebarDrag()`/`collapsedCats`/`sbDragClsId`, плюс обёртка `.nav-menu-classes*`) — разметка, которая это отображала (`#nav-menu-classes-block`), была вырезана ещё в заходе 9 при переходе на текущую галерею классов (`renderClassCard()`/`#classes-gallery-grid`), но сам JS/CSS остался висеть мёртвым грузом (безопасно, т.к. все обращения шли через `?.`/`if(!el)return`, но раздувало файл и сбивало с толку при поиске). Полностью убрано, включая вызов `initSidebarDrag()` в `_boot()`.
+    • ЦЕЛАЯ мёртвая подсистема — правый десктопный сайдбар атрибутов (`.content-right` с резайзом/сворачиванием: `.right-rh`/`.right-toggle-bar`/`.right-label`/`.right-inner`, JS `toggleRight()`/`applyLayout()`/`loadLayout()`/`saveLayout()`/`rightOff`/`layoutWidths`/`LAYOUT_KEY`, часть обработчиков mousedown/mousemove/mouseup). Обнаружено, что `.content-right{display:none!important;}` стоял БЕЗ единого условия отмены (ни в одном media-query дисплей обратно не включался) — то есть эта панель была ПОЛНОСТЬЮ и БЕЗУСЛОВНО скрыта всегда, при этом на каждый рендер класс-билдера всё равно рендерился (и ререндерился) `renderAttrPanel(cls)` второй раз в невидимый DOM — чистый расход. Атрибуты уже показываются через `.mob-attr-block` (несмотря на название "моб", он показывается на ВСЕХ размерах экрана, не только на мобильном — старое разделение десктоп/мобайл для атрибутов было упразднено ещё раньше, но название блока/комментарий остались от старой версии, поправил комментарий в коде).
+    • Также убраны точечные мёртвые CSS-хвосты: `.cls-accent-dot` (+ webkit color-swatch псевдоэлементы), `.class-cat-input` — оба относятся к полям, вырезанным из разметки в заходе 9, но CSS/упоминания в `applyROMode()` оставались; `.class-item.active`/`.class-item:hover` в блоке "DESIGN POLISH" (более поздний заход зачем-то ещё раз стилизовал уже мёртвый `.class-item`).
+    • НЕ ТРОГАЛ (по прямому решению из прошлых заходов, задокументированному в истории ниже): ручную палитру подклассов/категорий компендиума (`sub.color`/`COMP.categories[].color`) — это разные сущности, не тот же случай, что убранный `cls.accentColor`.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright): полный регресс по всем существующим QA-скриптам (sourceId-скоупинг, drag-переупорядочивание источников/классов, галерея 5-в-ряд, справочник/редирект/аккордеон, healOrphanClassCategories) — 0 ошибок консоли на каждом; новый QA-скрипт на правки этого захода — заливка плашек подклассов с сохранением цвета, единственный `.attr-title` без дублирующего лейбла, шрифт описания карточек (Calibri-стек вместо Cormorant Garamond), дефолты свежего посетителя (17px/100%/125% без localStorage) — все ОК; отдельно проверено через `document.querySelector` отсутствие DOM/классов удалённого мёртвого кода (`.content-right`, `#class-list`, `.cat-header`, `.cls-accent-dot`, `.class-cat-input`) — все отсутствуют, как и ожидалось. `node --check` на весь извлечённый JS — синтаксических ошибок нет.
+  НЕ СДЕЛАНО (сознательно отложено, следующим шагом): редизайн карточек умений по уровням (единый разворачиваемый спойлер на уровень вместо повторяющихся рамок — Adam явно попросил показать прогресс до завершения); структура раздела "Справочник" (Adam попросил идеи, ответ дан в чате текстом, решение пока не принято); плюс новый открытый запрос Adam — сохранить в глоссарий переводы предметов/оружия/брони с next.dnd.su/equipment (пока не начато, требует решения по формату/месту хранения — вероятно завязано на нерешённую структуру Справочника).
+2026-09-08 (17) — КРИТИЧНЫЙ ФИКС: ЗАПИСИ КОМПЕНДИУМА ТЕПЕРЬ СКОУПЯТСЯ ПО ИСТОЧНИКУ + СЕРИЯ МЕЛКИХ ПРАВОК ПО СКРИНШОТАМ. Adam завёл РЕАЛЬНЫЙ 2-й источник ("Master Oogway") и сразу поймал задокументированное с захода 9 ОГРАНИЧЕНИЕ: "решить момент с привязкой к источникам, а то вот уже новый источнику привязалось всё то что в лазерламе" (скриншот — у нового пустого источника счётчики "Приёмы (133)"/"Черты (45)", как у laserllama).
+  1) ГЛАВНЫЙ ФИКС — `COMP.entries[]` получили поле `sourceId`. Новая `healOrphanCompEntries()` (вызывается в `_boot()` сразу после `healOrphanClassCategories()`) — ОДНОРАЗОВО проставляет `sourceId='laserllama'` всем старым записям без этого поля. В ОТЛИЧИЕ от `healOrphanClassCategories()` — здесь угадывать не нужно ДАЖЕ при 2+ источниках: отсутствие sourceId однозначно означает "запись создана до появления 2-го источника", т.е. когда единственным источником был laserllama. `compFilterEntries()` (единая точка, через которую проходят ВСЕ 3 режима отображения компендиума — по типу/по имени/по уровню) теперь фильтрует по `currentSourceId`; `sectionCount()` (счётчики на кнопках главной) и `compAddEntry()` (новые записи сразу получают `sourceId: currentSourceId`) — тоже. Категории компендиума (`COMP.categories`) намеренно ОСТАВЛЕНЫ общими на все источники (это отдельный, больший вопрос архитектуры, не то, на что жаловался Adam) — счётчики при удалении/переносе категории (`compDeleteCat`/`compMoveCatSection`) специально считают записи ПО ВСЕМ источникам, т.к. это предупреждение перед операцией, которая как раз и затронет все источники разом.
+  2) Промежуточная страница-источник (`src/<id>` без раздела) — Adam: "эта страница всё ещё существует, надо её вырезать". `routeFromHash()` теперь редиректит голую ссылку сразу на главную (с разворачиванием карточки, `pendingExpandSourceId`, как и остальные "назад"-переходы с захода 13) вместо рендера старой страницы. Раздел "Справочник" (`src/<id>/reference`), который раньше делил этот же экран с мёртвой landing-page-логикой, теперь рендерится отдельной чистой функцией `renderReferenceView()` — без названия/описания источника, без ⚙Редактировать/Удалить и без повторных 4 кнопок разделов (они и так есть в аккордеоне главной) — просто "← Назад" + заголовок "Справочник · <Источник>" + заглушка "в разработке". Сама реальная СТРУКТУРА Справочника — отдельный открытый вопрос, Adam попросил предложить идеи (см. ответ в чате).
+  3) Аккордеон на главной визуально "разворачивал" СОСЕДНИЕ карточки тоже — Adam: "когда я нажимаю на один блок расширяются все, а должен только тот на который я нажал". Логика `toggleSourceCard()` на самом деле уже была per-card корректной — проблема оказалась чисто CSS: `.home-sources-grid` (CSS Grid) по умолчанию растягивает ВСЕ карточки одного ряда по высоте самой высокой (`align-items:stretch`), поэтому соседние нераскрытые карточки визуально "распухали" вслед за раскрытой, хотя их `.home-source-sections` внутри оставался честно свёрнут. Добавлен `align-items:start` — теперь каждая карточка высотой ровно по своему контенту, независимо от соседей.
+  4) Классы в галерее показывали 3 в ряд вместо 5, хотя карточки переиспользуют тот же `.home-sources-grid` — Adam: "в классах надо тоже по 5 блоков в ряд". Причина — `.classes-gallery-grid` имел собственный `max-width:900px`, оставшийся от более раннего варианта дизайна и не обновлённый вместе с `.home-body` (расширен до 1500px ещё в заходе 11). Подтянут до тех же 1500px.
+  5) Ссылки класса (`.cls-link-row` — превью-пилюля + поля названия/URL + удаление) переполняли строку на мобильном, требуя горизонтальный скролл — Adam: "уходит за край экрана, сделай без скролла". Классическая проблема flex: инпуты по умолчанию не сжимаются меньше своей "естественной" ширины (`min-width:auto`), даже с `flex:1`. Добавлены `flex-wrap:wrap` на строку, `min-width` на оба инпута и `text-overflow:ellipsis` на пилюлю-превью (обрезает длинный текст вместо растягивания).
+  6) Маленький невзрачный заголовок "Умения" над списком умений класса — Adam: "сделай больше и напиши адекватно, с красивым шрифтом" (это было "перед началом" более крупной задумки с редизайном самих карточек умений — она ЕЩЁ НЕ реализована, см. ниже). Переименован в "Классовые умения", новый модификатор `.section-title.abilities-title` — крупнее (0.69em→1.15em), var(--font-head) (Cinzel), var(--gold2), без uppercase/letter-spacing оригинального мелкого лейбла. Остальные `.section-title` (Подклассы/Таблица класса/Атрибуты) не тронуты — просился только этот.
+  7) Фавикон-компас — Adam: "сделай золотистой, но без фона". Убран `<rect>`-фон (тёмный скруглённый квадрат за компасом в SVG favicon), центральный кружок перекрашен с зелёного `--accent` на золотой (тот же `%239e7c32`, что у лучей/кольца) — теперь монохромно-золотой компас на прозрачном фоне, виден на любом цвете вкладки браузера.
+  НЕ СДЕЛАНО в этом заходе (сознательно отложено, следующим шагом): полный редизайн карточек умений (`.ability-card`) — убрать повторяющиеся рамки/бейджи одинакового уровня, сгруппировать в разворачивающиеся спойлеры по уровню, сохранив отдельные умения внутри и синхронизацию с таблицей — Adam явно попросил показать прогресс перед тем как продолжать; реальная структура раздела "Справочник" — идеи предложены в чате, ждём решения Adam.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, отдельный тест-сьют qa_sourceid.js на РЕАЛЬНОМ сценарии Adam — старые записи без sourceId + добавление 2-го источника): миграция проставляет старым записям laserllama; счётчики и содержимое компендиума для НОВОГО источника показывают честный 0, а не унаследованные числа; новая запись, созданная в новом источнике, не протекает обратно в старый. Плюс qa_batch17.js: голая ссылка редиректит на главную с разворотом карточки; Справочник рендерится чистым экраном; независимое раскрытие карточек (высоты РАЗНЫЕ, не растянуты); 5 карточек классов в ряду; на 375px ширины (мобильный) scrollWidth страницы не превышает viewport (без горизонтального скролла); заголовок "Классовые умения" — на Cinzel, увеличен. Прогнан полный регресс по всем более ранним QA-сьютам — без ошибок в консоли.
 2026-09-08 (16) — DRAG-ПЕРЕУПОРЯДОЧИВАНИЕ КАРТОЧЕК ИСТОЧНИКОВ НА ГЛАВНОЙ И КЛАССОВ В ГАЛЕРЕЕ. Adam: "теперь мне надо чтобы я мог перетаскивать... назначать порядок блокам в главном меню и в классах". До этого порядок карточек = порядок элементов в массиве `sources[]`/`classes[]` (как загрузились из Firestore/как создавались), никакого способа поменять его не было. Реализовано тем же паттерном, что уже использовался для колонок таблицы класса (`headerDragColId`) и категорий компендиума (`compMoveCatSection`/`initCompCatDrag`) — HTML5 drag-and-drop, `draggable="true"` на всю карточку (owner-only), маленький визуальный хэндл "⠿" (`.home-card-drag-h`, левый верхний угол, вторая сторона от ⚙-редактирования) — только для affordance, начать перетаскивание можно с любой точки карточки, т.к. интерактивные элементы (⚙/✕/клик-открытие) внутри draggable-контейнера уже давно сосуществуют без конфликтов (тот же `.comp-cat-item`). На drop — не отдельное поле `order`, а прямой `splice()` в самом массиве (перенос перетащенного элемента на позицию цели), т.к. `sources[]`/`classes[]` — плоские массивы без order-поля, в отличие от `COMP.categories`.
   1) Источники на главной (`initHomeSourceDrag()`, вызывается из `renderHome()`) — двигает элемент в `sources[]` по id, сохраняет через `saveSources()`, полный ре-рендер `renderHome()`.
   2) Классы в галерее (`initClassGalleryDrag()`, вызывается из `renderSidebar()`) — двигает элемент в `classes[]` по id (общий массив на все источники — переставляются только видимые в текущей галерее карточки, относительный порядок классов ДРУГИХ источников не трогается, т.к. splice ищет позицию цели в полном массиве), сохраняет через `save()`.
@@ -118,7 +143,7 @@ CHANGELOG (новое сверху):
 
 ОТКРЫТЫЕ ЗАДАЧИ (см. память для полного списка):
 - Классы — отдельная страница-галерея (карточки) вместо списка в меню — СДЕЛАНО 2026-09-07(9): src/<id>/classes (галерея) → src/<id>/classes/<classId> (билдер). Список в "Меню" (#nav-menu-classes-block) удалён.
-- Компендиум разделён на 2 независимые библиотеки (Черты/Приёмы) по полю section у категорий — СДЕЛАНО 2026-09-07(9). "Боевые стили" переименованы в "Черты". ОГРАНИЧЕНИЕ ОСТАЁТСЯ: записи всё ещё не фильтруются по источнику (нет sourceId в COMP.entries) — при появлении 2-го реального источника нужно добавить фильтр в обеих библиотеках.
+- Компендиум разделён на 2 независимые библиотеки (Черты/Приёмы) по полю section у категорий — СДЕЛАНО 2026-09-07(9). "Боевые стили" переименованы в "Черты". ОГРАНИЧЕНИЕ (записи не фильтровались по источнику) — ИСПРАВЛЕНО 2026-09-08(17): COMP.entries получили sourceId, healOrphanCompEntries(), фильтрация в compFilterEntries()/sectionCount()/compAddEntry(). COMP.categories по-прежнему общие на все источники — сознательное решение, отдельный вопрос.
 - Компендиум: 5 колонок — СДЕЛАНО 2026-09-07(8) через честные JS-колонки (compSplitColumns), CSS column-count оказался ненадёжен (схлопывался в одну колонку без явной высоты).
 - Редактор текста: контекстное меню форматирования — СДЕЛАНО 2026-09-07(9) точечно, ДОРАБОТАНО 2026-09-07(15) основательно по прямому запросу Adam: заголовок разделён на H1/H2/H3, добавлены "Выделение"(mark)/"Цитата"(blockquote), removeAllFormat переписан на Range.intersectsNode (снимает форматирование надёжно даже при выделении через несколько блоков — старая версия на closest(commonAncestorContainer) в этом случае не срабатывала), таблицы/таблицы бросков визуально подтянуты под новый дизайн (шрифт заголовков). ПОЛНЫЙ РЕДИЗАЙН с нуля по мотивам Obsidian (slash-команды, live preview, markdown-source режим) — по-прежнему НЕ ДЕЛАЛИ, Adam уточнил что имел в виду именно функции форматирования текста, не весь Obsidian целиком; редактор остаётся на contenteditable+execCommand.
 - Переназначение умения другому подклассу после создания — dropdown убран 2026-09-07(9) (Adam счёл лишним), теперь subId выставляется автоматически по активной вкладке подкласса в момент создания; ручного способа переназначить позже нет — если понадобится, добавить отдельно.
@@ -129,7 +154,7 @@ CHANGELOG (новое сверху):
 - Домашняя страница: карточки источников — СДЕЛАНО 2026-09-07(6). Доп. кнопки-ссылки (Discord и т.п.) — СДЕЛАНО 2026-09-07(7), homeLinks[]/"+ Кнопка".
 - Единая автоматическая палитра классов/подклассов/категорий вместо ручных цветовых пикеров — ЧАСТИЧНО: ручной цвет класса (cls.accentColor/.cls-accent-dot) убран 2026-09-07(9), плашки классовых умений теперь всегда var(--accent). Цвета подклассов (sub.color) и категорий компендиума остаются ручными по прямому запросу Adam (это разные библиотеки/сущности, не тот же кейс).
 - Редизайн .feature-tag (плашки умений в таблице) — СДЕЛАНО 2026-09-07(9) (единый цвет, кроме подклассовых), ДОРАБОТАНО 2026-09-07(15) (залитый фон вместо прозрачной обводки, по запросу "надо залитую плашку"). .ability-card (карточки умений) — СДЕЛАНО 2026-09-07(15): шрифт номера уровня и названия унифицирован на var(--font-head), левая рамка 2px→1px.
-- Домашние "плашки" источников с автоматическим счётчиком записей — СДЕЛАНО 2026-09-07(13): sectionCount(), "Классы (N)"/"Приёмы (N)"/"Черты (N)", у "Справочник" числа нет (нечего считать). ОГРАНИЧЕНИЕ: счётчики Приёмов/Черт общие на все источники (COMP.entries без sourceId), не per-источник.
+- Домашние "плашки" источников с автоматическим счётчиком записей — СДЕЛАНО 2026-09-07(13): sectionCount(), "Классы (N)"/"Приёмы (N)"/"Черты (N)", у "Справочник" числа нет (нечего считать). ОГРАНИЧЕНИЕ (счётчики были общие на все источники) — ИСПРАВЛЕНО 2026-09-08(17) вместе с sourceId-скоупингом компендиума.
 - "← Назад" из галереи классов вёл на промежуточную #source-view — СДЕЛАНО 2026-09-07(13): теперь сразу на главную с развёрнутой карточкой источника (pendingExpandSourceId). #source-view остаётся в коде рабочей только по прямой ссылке.
 - Пропавшие классы (cls.category не совпадал с currentSourceId из-за старого ручного поля-папки) — СДЕЛАНО 2026-09-07(11), healOrphanClassCategories() в _boot(). ОГРАНИЧЕНИЕ: работает только если источник ровно один — при 2+ источниках чинить некому (нельзя угадать, какому источнику принадлежит осиротевший класс), нужен отдельный ручной инструмент, когда появится второй реальный источник.
 - Поиск/сортировка в галерее классов — УБРАНЫ ПОЛНОСТЬЮ 2026-09-07(11) по прямому запросу Adam (не просто скрыты).
@@ -141,6 +166,16 @@ CHANGELOG (новое сверху):
 - Свои картинки-логотипы вместо/вместе с эмодзи для источников/классов/категорий компендиума — СДЕЛАНО 2026-09-07(12): поле img/iconImg, путь к файлу в своём же репозитории, приглушающий CSS-фильтр .site-badge-img. Заодно появилась editClassPrompt() — редактирование названия/описания/картинки существующего класса из галереи, раньше такой возможности не было вообще.
 - Название сайта в футере ("© Master Oogway · Гильдия Путеискателей") — СДЕЛАНО 2026-09-07(14): убрано, остался только ник "© Master Oogway", 3 места (.home-footer). Название сайта в заголовке/шапке (.home-title/.action-bar-title/<title>) не трогали — просилось убрать только из футера-копирайта.
 - Перетаскивание карточек источников на главной и классов в галерее для ручного порядка — СДЕЛАНО 2026-09-08(16): drag-and-drop (initHomeSourceDrag/initClassGalleryDrag), splice в sources[]/classes[] по id, owner-only, хэндл "⠿" слева сверху карточки.
+- Промежуточная страница-источник (голая src/<id>) — СДЕЛАНО 2026-09-08(17): редиректит на главную с развёрнутой карточкой вместо рендера старой разметки. Раздел "Справочник" теперь отдельная чистая функция renderReferenceView() (заглушка "в разработке"). СТРУКТУРА Справочника — ОТКРЫТО: Adam попросил идеи (2026-09-08), идеи предложены в чате текстом, решение не принято; отдельно от Adam пришёл конкретный запрос сохранить в глоссарий переводы предметов/оружия/брони с next.dnd.su/equipment — вероятно ляжет как часть Справочника, но формат/хранение не определены.
+- Аккордеон карточек на главной визуально "разворачивал" соседние карточки — СДЕЛАНО 2026-09-08(17): чисто CSS-баг (align-items:stretch на грид-контейнере), JS уже был per-card корректным. Добавлен align-items:start.
+- Галерея классов показывала 3 карточки в ряд вместо 5 — СДЕЛАНО 2026-09-08(17): .classes-gallery-grid max-width подтянут с 900px до 1500px (как у .home-body).
+- Мобильный оверфлоу строки ссылок класса (уезжала за край экрана) — СДЕЛАНО 2026-09-08(17): flex-wrap на .cls-link-row + min-width:0 на инпутах.
+- Заголовок "Умения" → "Классовые умения" в увеличенном Cinzel — СДЕЛАНО 2026-09-08(17), модификатор .abilities-title (не трогая общий .section-title). Аналогично для атрибутов ("Атрибуты"+"Ключевые атрибуты · X" объединены в один заголовок) — СДЕЛАНО 2026-09-08(18).
+- Favicon-компас — перекрашен в золотой без фона — СДЕЛАНО 2026-09-08(17).
+- Плашки подклассов (.sub-tab) без заливки (только обводка+текст) — СДЕЛАНО 2026-09-08(18): залиты по аналогии с .feature-tag в таблице, цвет каждого подкласса сохранён.
+- Шрифт описания карточек (Cormorant Garamond) "растворялся"/шумел на мелком кегле — СДЕЛАНО 2026-09-08(18): .home-source-desc переведён на var(--font) (санс-сериф).
+- Дефолты интерфейса для новых читателей (Шрифт UI/Масштаб/Шрифт таблицы) — СДЕЛАНО 2026-09-08(18): 13px/100%/85% → 17px/100%/125%. Это стартовые значения localStorage для тех, у кого его ещё нет, не общий "дефолт сайта" в Firestore.
+- Проход по мёртвому коду по прямому запросу Adam — СДЕЛАНО 2026-09-08(18): убран весь старый сайдбар-с-папками (не рендерился с захода 9), правый десктопный сайдбар атрибутов (был безусловно display:none, дублировал renderAttrPanel впустую), .cls-accent-dot/.class-cat-input (поля убраны в заходе 9, CSS/ro-mode-упоминания оставались), несколько мёртвых функций (deleteCustomTheme/loadTheme/updateClassAccent/toggleSort/getCeTable). Подробности — в CHANGELOG заход 18.
 ═══════════════════════════════════════════════════════════════════════════════ -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -149,50 +184,16 @@ CHANGELOG (новое сверху):
 <meta name="description" content="Гильдия Путеискателей. Homebrew tool by Master Oogway.">
 <meta name="generator" content="Гильдия Путеискателей — оригинальный инструмент Master Oogway">
 <title>Гильдия Путеискателей</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='10' fill='%23141a15'/><circle cx='32' cy='32' r='27' stroke='%239e7c32' stroke-opacity='.6' stroke-width='2'/><path d='M32 8L36 24L32 20L28 24Z' fill='%239e7c32'/><path d='M32 56L28 40L32 44L36 40Z' fill='%239e7c32' fill-opacity='.6'/><path d='M56 32L40 28L44 32L40 36Z' fill='%239e7c32' fill-opacity='.6'/><path d='M8 32L24 36L20 32L24 28Z' fill='%239e7c32' fill-opacity='.6'/><circle cx='32' cy='32' r='5' fill='%234e7a5c'/><circle cx='32' cy='32' r='2.5' fill='%23c49848'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='27' stroke='%239e7c32' stroke-opacity='.75' stroke-width='2.5'/><path d='M32 8L36 24L32 20L28 24Z' fill='%239e7c32'/><path d='M32 56L28 40L32 44L36 40Z' fill='%239e7c32' fill-opacity='.7'/><path d='M56 32L40 28L44 32L40 36Z' fill='%239e7c32' fill-opacity='.7'/><path d='M8 32L24 36L20 32L24 28Z' fill='%239e7c32' fill-opacity='.7'/><circle cx='32' cy='32' r='5' fill='%239e7c32'/><circle cx='32' cy='32' r='2.5' fill='%23c49848'/></svg>">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Playfair+Display:wght@600;700;800&display=swap">
 <style>
-:root{--bg:#141a15;--sidebar-bg:#182019;--panel:#1c2620;--panel2:#223028;--border:#2c3d30;--gold:#9e7c32;--gold2:#c49848;--text:#ded4b8;--muted:#a89e82;--accent:#4e7a5c;--sub:#8a6a3a;--font:'Calibri','Candara','Segoe UI',Arial,sans-serif;--font-head:'Cinzel',var(--font);--font-body:'Cormorant Garamond',Georgia,serif;--font-display:'Playfair Display',var(--font-head);--ui-fs:13px;--table-fs:0.85em;--radius:6px;--radius-sm:4px;--radius-pill:20px;}
+:root{--bg:#141a15;--sidebar-bg:#182019;--panel:#1c2620;--panel2:#223028;--border:#2c3d30;--gold:#9e7c32;--gold2:#c49848;--text:#ded4b8;--muted:#a89e82;--accent:#4e7a5c;--sub:#8a6a3a;--font:'Calibri','Candara','Segoe UI',Arial,sans-serif;--font-head:'Cinzel',var(--font);--font-body:'Cormorant Garamond',Georgia,serif;--font-display:'Playfair Display',var(--font-head);--ui-fs:17px;--table-fs:1.25em;--radius:6px;--radius-sm:4px;--radius-pill:20px;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;font-size:var(--ui-fs);overflow-x:hidden;}
 
-/* КЛАССЫ — список внутри навигационного меню (бывший постоянный сайдбар, вырезан по просьбе Adam:
-   "отдельное меню нужно отдельное окно" — весь список классов теперь живёт в #nav-menu-panel,
-   .main занимает всю ширину #app-view). Классы .sidebar-search/.class-list/.class-item/.add-class-btn/
-   .sidebar-author сохранены как есть — они не завязаны на родителя-сайдбар. */
-.sidebar-search{display:flex;flex-direction:column;gap:4px;padding:8px 8px 6px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.sb-search-inp{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 8px;font-size:0.85em;outline:none;font-family:var(--font);}
-.sb-search-inp:focus{border-color:var(--gold);}
-.sb-sort-btn{background:transparent;border:1px solid var(--border);color:var(--text);font-size:0.69em;padding:2px 6px;cursor:pointer;font-family:var(--font);letter-spacing:1px;width:100%;transition:all .15s;text-align:left;opacity:0.75;border-radius:var(--radius-sm);}
-.sb-sort-btn:hover,.sb-sort-btn.active{border-color:var(--gold);color:var(--gold);}
-.class-list{flex:1;}
-.cat-folder{margin-bottom:1px;}
-.cat-header{display:flex;align-items:center;gap:4px;padding:4px 6px 4px 4px;cursor:pointer;user-select:none;border-radius:3px;transition:background .1s;}
-.cat-header:hover{background:rgba(255,255,255,0.06);}
-.cat-header.drag-over{background:rgba(158,124,50,0.15);outline:1px dashed rgba(158,124,50,0.5);}
-.cat-chevron{font-size:0.62em;color:var(--muted);width:10px;text-align:center;flex-shrink:0;transition:transform .2s;display:inline-block;}
-.cat-header.collapsed .cat-chevron{transform:rotate(-90deg);}
-.cat-folder-icon{font-size:0.85em;flex-shrink:0;}
-.cat-name{flex:1;font-size:0.85em;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.cat-rename-inp{flex:1;background:var(--panel2);border:1px solid var(--gold);color:var(--text);font-size:0.85em;padding:1px 4px;outline:none;font-family:var(--font);min-width:0;}
-.cat-children{padding-left:12px;}
-.cat-children.hidden{display:none;}
-.class-item{padding:4px 7px 4px 5px;cursor:pointer;display:flex;align-items:center;gap:5px;border-radius:var(--radius-sm);transition:background .1s;overflow:hidden;}
-.class-item:hover{background:rgba(255,255,255,0.06);}
-.class-item.active{background:rgba(158,124,50,0.13);}
-.class-item.drag-over{background:rgba(158,124,50,0.1);outline:1px dashed rgba(158,124,50,0.4);}
-.cls-file-icon{font-size:0.77em;color:var(--muted);flex-shrink:0;}
-.class-item-name{flex:1;font-family:var(--font-head);font-size:0.88em;letter-spacing:0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.class-item-del{font-size:0.77em;color:var(--muted);cursor:pointer;padding:1px 4px;opacity:0;transition:opacity .15s;flex-shrink:0;}
-.class-item:hover .class-item-del{opacity:1;}
-.class-item-del:hover{color:#c06060;}
 .ft-label{display:block;font-size:1em;font-weight:700;}
 .ft-hint{display:block;font-size:0.82em;color:var(--muted);font-style:italic;margin-top:1px;opacity:0.8;}
 .ab-sl-label{font-size:0.69em;color:var(--sub);background:rgba(138,106,58,0.12);border:1px solid rgba(138,106,58,0.22);padding:1px 5px;white-space:nowrap;flex-shrink:0;}
-.add-class-btn{margin:10px;padding:9px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.77em;letter-spacing:1px;text-align:center;transition:all .15s;white-space:nowrap;font-family:var(--font);border-radius:var(--radius-sm);}
-.add-class-btn:hover,.add-class-btn.drag-over{border-color:var(--gold);color:var(--gold);}
-.add-class-btn.drag-over{border-style:solid;background:rgba(158,124,50,0.07);}
-.sidebar-author{padding:7px 10px 8px;font-size:0.65em;color:var(--text);letter-spacing:1px;border-top:1px solid var(--border);text-align:center;opacity:0.55;flex-shrink:0;white-space:nowrap;overflow:hidden;}
 
 /* MAIN — теперь единственная колонка в #app-view (сайдбар вырезан), занимает всю ширину */
 .main{flex:1;width:100%;overflow-y:auto;min-width:0;}
@@ -211,26 +212,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .class-name-input::placeholder{color:var(--muted);}
 .class-meta{display:flex;gap:10px;margin-top:4px;align-items:center;}
 .class-desc-input{font-size:1.05em;font-style:italic;color:var(--muted);background:transparent;border:none;outline:none;flex:1;font-family:var(--font);}
-.class-cat-input{font-size:0.77em;color:var(--accent);background:transparent;border:1px solid transparent;outline:none;width:110px;padding:1px 4px;font-family:var(--font);}
-.class-cat-input:focus{border-color:var(--accent);}
-.class-cat-input::placeholder{color:var(--muted);}
 .hdr-line{width:100%;height:1px;background:linear-gradient(90deg,var(--gold),transparent);margin-top:10px;}
 
 /* LAYOUT */
 .content-wrap{display:flex;align-items:flex-start;}
 .content-left{flex:1;min-width:0;padding:18px 22px;}
-.content-right{display:none!important;}
-.content-right.no-transition{transition:none!important;}
-.content-right.collapsed{width:36px!important;min-width:36px!important;}
-.right-toggle-bar{display:flex;align-items:center;justify-content:flex-end;padding:10px 10px 6px;border-bottom:1px solid var(--border);background:var(--bg);z-index:2;}
-.right-label{font-size:0.69em;letter-spacing:3px;color:var(--muted);text-transform:uppercase;white-space:nowrap;overflow:hidden;flex:1;padding-left:2px;font-weight:700;}
-.content-right.collapsed .right-label{opacity:0;}
-.right-toggle{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:0.85em;padding:2px;flex-shrink:0;line-height:1;transition:color .15s;}
-.right-toggle:hover{color:var(--gold);}
-.right-inner{padding:0;}
-.content-right.collapsed .right-inner{display:none;}
-.right-rh{position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:10;}
-.right-rh:hover,.right-rh.active{background:rgba(158,124,50,0.25);}
 
 .intro-save-btn{background:var(--gold);border:none;color:#0c0e18;font-size:0.82em;font-weight:700;padding:6px 16px;cursor:pointer;letter-spacing:1px;font-family:var(--font);border-radius:var(--radius-sm);}
 .intro-save-btn:hover{background:var(--gold2);}
@@ -243,7 +229,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .sp-add-theme-btn:hover{border-color:var(--gold);color:var(--gold);}
 
 /* ATTR PANEL */
-.attr-title{font-size:0.85em;font-weight:700;text-align:center;padding:12px 10px 10px;color:var(--text);border-bottom:1px solid var(--border);}
+.attr-title{font-size:1.15em;font-weight:700;text-align:left;padding:0 0 7px;color:var(--gold2);border-bottom:1px solid var(--border);font-family:var(--font-head);letter-spacing:0.5px;margin-bottom:12px;}
 .attr-field{border-bottom:1px solid rgba(44,61,48,0.4);}
 .attr-field:last-child{border-bottom:none;}
 .attr-lbl{text-align:right;font-size:0.72em;color:var(--muted);font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 10px 1px;}
@@ -253,6 +239,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 /* SECTION */
 .section{margin-bottom:26px;}
 .section-title{font-size:0.69em;letter-spacing:4px;color:var(--muted);text-transform:uppercase;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:12px;font-weight:700;}
+.section-title.abilities-title{font-size:1.15em;font-family:var(--font-head);letter-spacing:0.5px;text-transform:none;color:var(--gold2);}
 
 /* LEVEL TABLE */
 .ltable-wrap{overflow-x:auto;}
@@ -298,9 +285,9 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 
 /* SUBCLASSES */
 .sub-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
-.sub-tab{font-size:0.77em;letter-spacing:1px;padding:5px 12px;border:1px solid rgba(200,200,230,0.22);background:rgba(255,255,255,0.06);color:var(--text);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
-.sub-tab:hover{border-color:var(--sub);color:var(--sub);}
-.sub-tab.active{border-color:var(--sub);color:var(--sub);background:rgba(138,106,58,0.08);}
+.sub-tab{font-size:0.77em;letter-spacing:1px;padding:5px 12px;border:1px solid rgba(78,122,92,0.45);background:rgba(78,122,92,0.16);color:var(--accent);font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
+.sub-tab:hover{border-color:var(--sub);color:var(--sub);background:rgba(138,106,58,0.2);}
+.sub-tab.active{border-color:var(--sub);color:var(--sub);background:rgba(138,106,58,0.3);}
 .add-sub-btn{font-size:0.77em;letter-spacing:1px;padding:5px 10px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
 .add-sub-btn:hover{border-color:var(--sub);color:var(--sub);}
 .sub-editor{background:var(--panel);border:1px solid var(--border);padding:12px;margin-bottom:10px;border-radius:var(--radius);}
@@ -433,12 +420,6 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 input[type=color].sp-color-swatch{-webkit-appearance:none;appearance:none;padding:0;}
 input[type=color].sp-color-swatch::-webkit-color-swatch-wrapper{padding:0;border-radius:1px;}
 input[type=color].sp-color-swatch::-webkit-color-swatch{border:none;border-radius:1px;}
-input[type=color].cls-accent-dot{-webkit-appearance:none;appearance:none;padding:0;border:none;}
-input[type=color].cls-accent-dot::-webkit-color-swatch-wrapper{padding:0;border-radius:1px;}
-input[type=color].cls-accent-dot::-webkit-color-swatch{border:none;border-radius:1px;}
-/* Per-class accent dot in header */
-.cls-accent-dot{width:14px;height:14px;border-radius:2px;border:1px solid var(--border);cursor:pointer;flex-shrink:0;transition:transform .12s;display:inline-block;vertical-align:middle;margin-left:4px;margin-right:2px;background:none;}
-.cls-accent-dot:hover{transform:scale(1.2);border-color:var(--gold);}
 /* Overlay color input trick — transparent input covering a button/label */
 .color-input-overlay{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none;padding:0;}
 
@@ -492,11 +473,6 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   /* Панели — вертикальный стек */
   .content-wrap{flex-direction:column;}
   .content-left{padding:12px 14px;}
-  .content-right{width:100%!important;min-width:100%!important;position:static!important;max-height:none!important;border-left:none;border-top:1px solid var(--border);}
-  .content-right.collapsed{width:100%!important;min-width:100%!important;}
-  .content-right.collapsed .right-inner{display:block!important;}
-  .right-rh,.right-toggle-bar .right-toggle{display:none!important;}
-  .right-toggle-bar{position:static;}
   /* Экшн-бар */
   .action-bar{padding:6px 10px;gap:4px;}
   .action-bar-title{display:none;}
@@ -505,10 +481,7 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   .class-name-input{font-size:1.2em;}
   .class-meta{flex-wrap:wrap;gap:6px;}
   /* Touch-цели ≥36px */
-  .act-btn,.btn,.tiny-btn,.ab-btn,.add-col-btn,.col-tpl-btn,.add-ab-btn,.add-class-btn,.add-sub-btn,.sub-del-btn,.sp-btn,.sp-reset-btn{min-height:36px;}
-  .class-item{padding:10px 8px;min-height:40px;}
-  .class-item-del{opacity:1!important;}
-  .cat-header{padding:8px 6px;}
+  .act-btn,.btn,.tiny-btn,.ab-btn,.add-col-btn,.col-tpl-btn,.add-ab-btn,.add-sub-btn,.sub-del-btn,.sp-btn,.sp-reset-btn{min-height:36px;}
   /* Плавающий тулбар */
   .ft-btn{min-width:40px;min-height:40px;font-size:1em;}
   /* Контекстное меню */
@@ -518,9 +491,6 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   /* Панель настроек — остаётся absolute, только расширяем влево и ограничиваем высоту */
   .settings-panel{left:auto;right:0;min-width:260px;max-height:80dvh;overflow-y:auto;}
   .sp-color-swatch{width:24px;height:24px;}
-  /* Атрибуты: на мобильном — после таблицы, правая колонка — скрыта */
-  .mob-attr-block{display:block;}
-  .content-right{display:none!important;}
   /* Таблица: auto-layout чтобы колонки сами расширялись, wrap скроллится горизонтально */
   .ltable-wrap{-webkit-overflow-scrolling:touch;overflow-x:auto;max-width:100%;}
   table.ltable{table-layout:auto;width:max-content;min-width:100%;}
@@ -668,11 +638,11 @@ body.comp-mode #screen-compendium{display:flex!important;}
 
 /* LINKS */
 .cls-links-wrap{margin-top:6px;display:flex;flex-direction:column;gap:3px;}
-.cls-link-row{display:flex;align-items:center;gap:5px;}
-.cls-link-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;background:rgba(158,124,50,0.07);border:1px solid rgba(158,124,50,0.32);color:var(--gold2);font-size:0.78em;cursor:pointer;text-decoration:none;transition:background .15s;}
+.cls-link-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.cls-link-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;background:rgba(158,124,50,0.07);border:1px solid rgba(158,124,50,0.32);color:var(--gold2);font-size:0.78em;cursor:pointer;text-decoration:none;transition:background .15s;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cls-link-pill:hover{background:rgba(158,124,50,0.16);border-color:var(--gold2);}
-.cls-link-label-inp{width:90px;font-size:0.79em;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 6px;outline:none;font-family:var(--font);}
-.cls-link-url-inp{flex:1;font-size:0.79em;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 6px;outline:none;font-family:var(--font);}
+.cls-link-label-inp{width:90px;min-width:0;font-size:0.79em;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 6px;outline:none;font-family:var(--font);}
+.cls-link-url-inp{flex:1;min-width:80px;font-size:0.79em;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 6px;outline:none;font-family:var(--font);}
 .cls-link-del{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:0.8em;padding:0 3px;line-height:1;transition:color .12s;}
 .cls-link-del:hover{color:#c04444;}
 .add-link-btn{font-size:0.74em;padding:2px 9px;background:transparent;border:1px dashed rgba(158,124,50,0.35);color:var(--gold2);border-radius:12px;cursor:pointer;font-family:var(--font);transition:all .15s;}
@@ -680,8 +650,6 @@ body.comp-mode #screen-compendium{display:flex!important;}
 
 /* DESIGN POLISH */
 .action-bar{box-shadow:0 1px 0 rgba(158,124,50,0.18);}
-.class-item.active{background:rgba(158,124,50,0.10);border-left:2px solid var(--gold);padding-left:2px;}
-.class-item:hover{background:rgba(255,255,255,0.07);}
 .act-btn:hover{border-color:var(--gold2);color:var(--gold2);box-shadow:0 0 8px rgba(158,124,50,0.15);}
 .hdr-line{background:linear-gradient(90deg,var(--gold),rgba(158,124,50,0.15),transparent);height:2px;}
 ::-webkit-scrollbar{width:6px;height:6px;}
@@ -717,13 +685,13 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-body{max-width:1500px;margin:0 auto;padding:0 28px 80px;}
 .home-section-label{font-family:var(--font-head);font-size:0.72em;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:12px;margin-bottom:18px;}
 .home-section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(158,124,50,0.3),transparent);}
-.home-sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;}
+.home-sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-items:start;}
 .home-source-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:22px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
 .home-source-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--gold),var(--accent));opacity:0;transition:opacity .2s;}
 .home-source-card:hover{border-color:var(--accent);background:var(--panel2);}
 .home-source-card:hover::before{opacity:0.7;}
 .home-source-name{font-family:var(--font-head);font-size:1.05em;font-weight:600;color:var(--gold2);letter-spacing:0.04em;margin-bottom:6px;}
-.home-source-desc{font-family:var(--font-body);font-size:1em;color:var(--muted);line-height:1.5;margin-bottom:14px;}
+.home-source-desc{font-family:var(--font);font-size:0.93em;color:var(--muted);line-height:1.5;margin-bottom:14px;}
 .home-source-stats{display:flex;gap:8px;flex-wrap:wrap;}
 .home-stat-tag{font-size:0.72em;font-family:var(--font);color:var(--accent);background:rgba(78,122,92,0.12);border:1px solid rgba(78,122,92,0.3);border-radius:var(--radius-sm);padding:2px 9px;letter-spacing:0.03em;}
 .home-source-sections{display:flex;flex-wrap:wrap;gap:8px;max-height:0;opacity:0;overflow:hidden;transition:max-height .32s ease,opacity .22s ease,margin-top .32s ease;margin-top:0;}
@@ -768,7 +736,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .source-desc{font-family:var(--font-body);color:var(--muted);font-size:1.08em;margin-bottom:8px;}
 .source-sections-grid{max-width:900px;margin:26px auto 0;padding:0 24px 60px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
 .source-section-btn{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:22px 14px;text-align:center;cursor:pointer;font-family:var(--font-head);font-size:0.95em;letter-spacing:0.04em;color:var(--text);transition:all .15s;}
-.classes-gallery-grid{max-width:900px;margin:10px auto 0;padding:0 24px 60px;}
+.classes-gallery-grid{max-width:1500px;margin:10px auto 0;padding:0 24px 60px;}
 .source-section-btn:hover{border-color:var(--gold);color:var(--gold2);background:var(--panel2);}
 .source-stub{max-width:600px;margin:20px auto 60px;text-align:center;color:var(--muted);font-family:var(--font);padding:0 24px;grid-column:1/-1;}
 
@@ -784,12 +752,6 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .nav-menu-item:hover{background:rgba(158,124,50,0.08);color:var(--gold2);}
 .nav-menu-item.active{border-left-color:var(--gold);color:var(--gold2);background:rgba(158,124,50,0.1);}
 .nav-menu-sep{height:1px;background:var(--border);margin:10px 18px;}
-/* Список классов внутри меню — виден только когда открыт раздел "Классы" (см. renderNavMenu) */
-.nav-menu-classes{display:none;flex-direction:column;min-height:0;flex:1;padding:0 4px;}
-.nav-menu-classes.show{display:flex;}
-.nav-menu-classes .sidebar-search{padding-left:14px;padding-right:14px;}
-.nav-menu-classes .class-list{overflow-y:auto;padding:0 8px;}
-.nav-menu-classes .add-class-btn{margin:10px 14px;}
 .action-bar-title{cursor:pointer;}
 </style>
 <!-- Firebase SDK -->
@@ -835,10 +797,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <!-- ═══ СТРАНИЦА ИСТОЧНИКА — landing между Главной и разделами (Классы/Приёмы/...) ═══ -->
 <div id="source-view" class="r-hidden">
   <div class="source-hero">
-    <button class="source-home-link" onclick="location.hash=''">← Главная</button>
+    <button class="source-home-link" id="reference-back-btn">← Назад</button>
     <h1 class="source-title" id="source-title"></h1>
-    <p class="source-desc" id="source-desc"></p>
-    <div id="source-edit-wrap" style="display:flex;gap:8px;justify-content:center;margin-top:10px;"></div>
   </div>
   <div class="source-sections-grid" id="source-sections-grid"></div>
   <div class="home-footer">© Master Oogway</div>
@@ -974,7 +934,7 @@ var currentUser = null;
 var _booted = false;
 
 /* STORAGE — © Master Oogway */
-const SK_NEW='guild-cls-v4', SK_OLD='guild-cls-v3', LAYOUT_KEY='guild-cls-layout';
+const SK_NEW='guild-cls-v4', SK_OLD='guild-cls-v3';
 
 /* SPELL SLOT DATA */
 const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX'];
@@ -1016,12 +976,10 @@ let homeLinks=[], editingHomeLinkId=null;
 const DEFAULT_HOME_LINKS=[
   {id:'discord', label:'Discord сервер', url:'https://discord.gg/WXRnWaZ7K'}
 ];
-let rightOff=false, sortAlpha=false;
-let collapsedCats=new Set(), sbDragClsId=null;
-let uiScale=1.0, abClickTimer=null;
-let layoutWidths={right:255};
+let sortAlpha=false;
+let uiScale=1.0, abClickTimer=null; // 100% — дефолт для читателей (заход 18)
 let activeCeEl=null; // currently focused contenteditable
-let uiTableFontSize=0.85; // em multiplier relative to body font
+let uiTableFontSize=1.25; // em multiplier relative to body font
 let themeVars={}; // CSS variable overrides stored in localStorage
 
 /* DEFAULT */
@@ -1103,8 +1061,21 @@ function healOrphanClassCategories(){
   if (healed) save();
 }
 
+/* Заход 17: записи компендиума (COMP.entries) исторически не имели sourceId — компендиум был общий
+   на единственный источник laserllama. Как только Adam завёл 2-й реальный источник, все старые записи
+   стали (без этой миграции) видны/считаться СРАЗУ во всех источниках — тот самый ОГРАНИЧЕНИЕ, задокументированное
+   с захода 9. В отличие от healOrphanClassCategories() выше — здесь угадывать НЕ НУЖНО даже при 2+ источниках:
+   отсутствие sourceId однозначно означает "запись создана до появления этой фичи", т.е. когда единственным
+   источником был laserllama — поэтому просто и безопасно привязываем такие записи к нему. */
+function healOrphanCompEntries(){
+  const fallback = sources.some(s=>s.id==='laserllama') ? 'laserllama' : (sources[0]?.id||'laserllama');
+  let healed=false;
+  (COMP.entries||[]).forEach(e=>{ if(!e.sourceId){ e.sourceId=fallback; healed=true; } });
+  if(healed) saveComp();
+}
+
 /* SCALE & FONT SIZE */
-let uiFontSize=13;
+let uiFontSize=17;
 function loadScale(){ try{const v=parseFloat(localStorage.getItem('guild-cls-scale')); if(v&&v>=0.6&&v<=1.5)uiScale=v;}catch(e){} }
 function saveScale(){ localStorage.setItem('guild-cls-scale',uiScale); }
 function applyScale(){ document.body.style.zoom=uiScale; }
@@ -1168,13 +1139,6 @@ function addCustomTheme(){
   customThemes.push({id:'custom-'+Date.now(),name:name.trim(),color,vars:{...themeVars}});
   saveCustomThemes(); renderMain();
 }
-function deleteCustomTheme(id){
-  if(!confirm('Удалить эту тему?'))return;
-  customThemes=customThemes.filter(t=>t.id!==id);
-  saveCustomThemes(); renderMain();
-}
-
-function loadTheme(){ try{ const r=localStorage.getItem('guild-cls-theme'); if(r)themeVars=JSON.parse(r); }catch(e){} }
 function saveTheme(){ _saveConfig(); }
 function applyTheme(){
   const el=document.documentElement;
@@ -1208,12 +1172,6 @@ function refreshSettingsSwatches(){
     if(sw) sw.value=themeVars[v]||THEME_DEFAULTS[v]||'#000000';
   });
 }
-/* Per-class accent color — called directly from input[type=color] oninput */
-function updateClassAccent(val){
-  const cls=getActive(); if(!cls)return;
-  cls.accentColor=val; save(); reTable();
-}
-
 /* Per-subclass color — oninput: live visual update only (no renderMain — would destroy open picker) */
 function updateSubColorLive(subId,val){
   const cls=getActive(); if(!cls)return;
@@ -1297,31 +1255,8 @@ document.addEventListener('mousedown',e=>{
   }
 },true);
 
-/* LAYOUT */
-function loadLayout(){ try{ const r=localStorage.getItem(LAYOUT_KEY); if(r) layoutWidths={...layoutWidths,...JSON.parse(r)}; }catch(e){} }
-function saveLayout(){ localStorage.setItem(LAYOUT_KEY,JSON.stringify(layoutWidths)); }
-function applyLayout(){
-  const right=document.querySelector('.content-right');
-  if(right&&!rightOff){ right.style.width=layoutWidths.right+'px'; right.style.minWidth=layoutWidths.right+'px'; }
-}
-
-/* RIGHT TOGGLE */
-function toggleRight(){
-  rightOff=!rightOff;
-  const r=document.querySelector('.content-right'); if(!r)return;
-  r.classList.toggle('collapsed',rightOff);
-  if(!rightOff){ r.style.width=layoutWidths.right+'px'; r.style.minWidth=layoutWidths.right+'px'; requestAnimationFrame(autoHAll); }
-  const btn=document.querySelector('.right-toggle');
-  if(btn) btn.textContent=rightOff?'◁':'▷';
-}
-function toggleSort(){
-  sortAlpha=!sortAlpha;
-  document.getElementById('sb-sort')?.classList.toggle('active',sortAlpha);
-  renderSidebar();
-}
-
 /* RESIZE HANDLES */
-let colResizing=null, rightResizing=false, rightStartX=0, rightStartW=0;
+let colResizing=null;
 document.addEventListener('mousedown',e=>{
   const rh=e.target.closest('.col-rh');
   if(rh){ const th=rh.closest('th'); if(!th)return;
@@ -1336,15 +1271,12 @@ document.addEventListener('mousedown',e=>{
     }
     const startW=parseInt(window.getComputedStyle(th).width,10);
     colResizing={colId:th.dataset.col,startX:e.clientX,startW}; rh.classList.add('active'); document.body.classList.add('col-resizing'); e.preventDefault(); return; }
-  if(e.target.closest('.right-rh')&&!rightOff){ const r=document.querySelector('.content-right'); rightResizing=true; rightStartX=e.clientX; rightStartW=r.offsetWidth; e.target.closest('.right-rh').classList.add('active'); r.classList.add('no-transition'); document.body.classList.add('col-resizing'); e.preventDefault(); return; }
 });
 document.addEventListener('mousemove',e=>{
   if(colResizing){ const cls=getActive(); if(!cls)return; const dx=e.clientX-colResizing.startX; const nw=Math.max(24,colResizing.startW+dx); if(!cls.colWidths)cls.colWidths={}; cls.colWidths[colResizing.colId]=nw; const th=document.querySelector(`th[data-col="${CSS.escape(colResizing.colId)}"]`); if(th)th.style.width=nw+'px'; return; }
-  if(rightResizing){ const dx=rightStartX-e.clientX; const w=Math.max(160,Math.min(600,rightStartW+dx)); const r=document.querySelector('.content-right'); r.style.width=w+'px'; r.style.minWidth=w+'px'; layoutWidths.right=w; return; }
 });
 document.addEventListener('mouseup',()=>{
   if(colResizing){ const cls=getActive(); if(cls)save(); document.querySelectorAll('.col-rh.active').forEach(el=>el.classList.remove('active')); colResizing=null; document.body.classList.remove('col-resizing'); return; }
-  if(rightResizing){ rightResizing=false; document.querySelector('.content-right')?.classList.remove('no-transition'); document.querySelectorAll('.right-rh.active').forEach(el=>el.classList.remove('active')); document.body.classList.remove('col-resizing'); saveLayout(); requestAnimationFrame(autoHAll); return; }
 });
 window.addEventListener('resize',()=>requestAnimationFrame(autoHAll));
 
@@ -1478,17 +1410,13 @@ function applyROMode() {
     '.act-btn.edit-only{display:none!important;}' +
     '.panel-settings-lbl.edit-only{display:none!important;}' +
     '.sp-owner-only{display:none!important;}' +
-    /* sidebar */
-    '.add-class-btn{display:none!important;}' +
-    '.class-item-del{display:none!important;}' +
     /* links */
     '.add-link-btn{display:none!important;}' +
     '.cls-link-del{display:none!important;}' +
     '.cls-link-label-inp,.cls-link-url-inp{display:none!important;}' +
-    '.cls-accent-dot{display:none!important;}' +
     '.cls-links-wrap{flex-direction:row!important;flex-wrap:wrap!important;}' +
     /* class header inputs → plain text look */
-    '.class-name-input,.class-desc-input,.class-cat-input{pointer-events:none!important;cursor:default!important;background:transparent!important;border:none!important;outline:none!important;}' +
+    '.class-name-input,.class-desc-input{pointer-events:none!important;cursor:default!important;background:transparent!important;border:none!important;outline:none!important;}' +
     /* table */
     '.col-drag-handle{display:none!important;}' +
     '.del-col-btn{display:none!important;}' +
@@ -1602,83 +1530,6 @@ function initClassGalleryDrag(){
       classes.splice(tgtIdx,0,moved);
       save(); renderSidebar();
     });
-  });
-}
-
-function toggleCat(cat){
-  if(collapsedCats.has(cat)) collapsedCats.delete(cat);
-  else collapsedCats.add(cat);
-  renderSidebar();
-}
-
-function renameCatInline(el,oldCat){
-  const inp=document.createElement('input');
-  inp.className='cat-rename-inp'; inp.value=oldCat;
-  el.replaceWith(inp); inp.focus(); inp.select();
-  const commit=()=>{
-    const newCat=inp.value.trim()||oldCat;
-    if(newCat!==oldCat) classes.forEach(c=>{ if((c.category||'')===(oldCat))c.category=newCat; });
-    save(); renderSidebar();
-  };
-  inp.addEventListener('blur',commit);
-  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();commit();} if(e.key==='Escape'){inp.value=oldCat;commit();} });
-}
-
-function initSidebarDrag(){
-  const list=document.getElementById('class-list'); if(!list)return;
-  list.addEventListener('dragstart',e=>{
-    const item=e.target.closest('.class-item[draggable]'); if(!item)return;
-    sbDragClsId=parseInt(item.dataset.clsId);
-    e.dataTransfer.effectAllowed='move';
-    e.dataTransfer.setData('text/plain',String(sbDragClsId));
-    setTimeout(()=>item.style.opacity='0.4',0);
-  },true);
-  list.addEventListener('dragend',e=>{
-    const item=e.target.closest('.class-item'); if(item)item.style.opacity='';
-    list.querySelectorAll('.class-item.drag-over,.cat-header.drag-over').forEach(el=>el.classList.remove('drag-over'));
-    sbDragClsId=null;
-  },true);
-  list.addEventListener('dragover',e=>{
-    if(sbDragClsId==null)return;
-    e.preventDefault(); // всегда разрешаем drop (нужно для выноса из папки)
-    const item=e.target.closest('.class-item');
-    const catHdr=e.target.closest('.cat-header');
-    list.querySelectorAll('.class-item.drag-over,.cat-header.drag-over,.add-class-btn.drag-over').forEach(el=>el.classList.remove('drag-over'));
-    if(item && parseInt(item.dataset.clsId)!==sbDragClsId) item.classList.add('drag-over');
-    else if(catHdr) catHdr.classList.add('drag-over');
-    // пустое место в сайдбаре — подсвечиваем кнопку "Добавить" как целевую зону
-    else { const ab=list.querySelector('.add-class-btn')||list.parentElement?.querySelector('.add-class-btn'); if(ab) ab.classList.add('drag-over'); }
-  });
-  list.addEventListener('drop',e=>{
-    if(sbDragClsId==null)return;
-    list.querySelectorAll('.class-item.drag-over,.cat-header.drag-over,.add-class-btn.drag-over').forEach(el=>el.classList.remove('drag-over'));
-    const srcCls=classes.find(c=>c.id===sbDragClsId);
-    if(!srcCls){sbDragClsId=null;return;}
-    const catHdr=e.target.closest('.cat-header');
-    const item=e.target.closest('.class-item');
-    if(catHdr){
-      e.preventDefault();
-      const newCat=catHdr.closest('.cat-folder')?.dataset.cat||'';
-      srcCls.category=newCat;
-      sbDragClsId=null; save(); renderSidebar(); return;
-    }
-    if(item){
-      e.preventDefault();
-      const tgtId=parseInt(item.dataset.clsId);
-      if(tgtId===sbDragClsId){sbDragClsId=null;return;}
-      const tgtCls=classes.find(c=>c.id===tgtId);
-      if(!tgtCls){sbDragClsId=null;return;}
-      srcCls.category=tgtCls.category||'';
-      const si=classes.findIndex(c=>c.id===sbDragClsId);
-      const [moved]=classes.splice(si,1);
-      const newTi=classes.findIndex(c=>c.id===tgtId);
-      classes.splice(newTi,0,moved);
-      sbDragClsId=null; save(); renderSidebar(); return;
-    }
-    // Drop на пустое место — убираем из папки (category='')
-    e.preventDefault();
-    srcCls.category='';
-    sbDragClsId=null; save(); renderSidebar();
   });
 }
 
@@ -2198,7 +2049,7 @@ function renderMain(){
         <div class="sub-tab${activeSubId===null?' active':''}" onclick="selectSub(null)" style="${activeSubId===null?'border-color:var(--border);color:var(--muted);background:rgba(255,255,255,0.04);':''}">Без подкласса</div>
         ${subs.map(s=>{
           const sc=s.color||null;
-          const styl=sc?`border-color:${sc};color:${sc};${s.id===activeSubId?`background:${sc}18;`:''}`:s.id===activeSubId?'':'';
+          const styl=sc?`border-color:${sc};color:${sc};background:${sc}${s.id===activeSubId?'4d':'29'};`:'';
           return `<div class="sub-tab${s.id===activeSubId?' active':''}" onclick="selectSub(${s.id})" style="${styl}">${esc(s.name)}</div>`;
         }).join('')}
         <button class="add-sub-btn" onclick="addSubPrompt()">+ Подкласс</button>
@@ -2218,28 +2069,18 @@ function renderMain(){
         <button class="col-tpl-btn" onclick="applySlotTemplate('third')">Треть-кастер</button>
       </div>
     </div>
-    <!-- Мобильный блок атрибутов (между таблицей и умениями, скрыт на десктопе) -->
+    <!-- Блок атрибутов (единственная панель атрибутов — правый сайдбар с этой же панелью был удалён как мёртвый код, заход 18) -->
     <div class="mob-attr-block">
-      <div class="section-title" style="font-size:0.69em;letter-spacing:4px;color:var(--muted);text-transform:uppercase;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:12px;font-weight:700;">Атрибуты</div>
       ${renderAttrPanel(cls)}
     </div>
     <div class="section">
-      <div class="section-title">Умения</div>
+      <div class="section-title abilities-title">Классовые умения</div>
       <div class="abilities-list" id="abilities-list">${renderAbilities(cls)}</div>
       <button class="add-ab-btn" onclick="addAbility()">+ Добавить умение</button>
     </div>
   </div>
-  <div class="content-right${rightOff?' collapsed':''}">
-    <div class="right-rh"></div>
-    <div class="right-toggle-bar">
-      <span class="right-label">Атрибуты</span>
-      <button class="right-toggle" onclick="toggleRight()">${rightOff?'◁':'▷'}</button>
-    </div>
-    <div class="right-inner">${renderAttrPanel(cls)}</div>
-  </div>
 </div>`;
 
-  applyLayout();
     setupTableDrag();
   setupColHeaderDrag();
   requestAnimationFrame(()=>requestAnimationFrame(autoHAll));
@@ -2653,11 +2494,6 @@ function saveCeIfActive(){
   if(activeCeEl){ const id=parseInt(activeCeEl.dataset.id); if(id)saveCeBody(activeCeEl,id); }
 }
 
-function getCeTable(e){
-  // find the table related to last ctx event — use ctxCeEl + saved target
-  return ctxCeEl?.querySelector('table.ce-table:focus-within') || ctxCeEl?.querySelector('table.ce-table');
-}
-
 function promptInsertTable(){
   hideCtxMenu();
   const rows=parseInt(prompt('Строки:','3')||'3');
@@ -3043,6 +2879,9 @@ function renderCompLegend() {
 /* ---------- FILTER ---------- */
 function compFilterEntries() {
   let list = [...COMP.entries];
+  // Заход 17: скоуп по источнику — без этого записи "Приёмов"/"Черт" одного источника (напр. laserllama)
+  // были видны и считались во ВСЕХ источниках (Adam поймал это сразу, как только появился 2-й реальный источник).
+  if (currentSourceId) list = list.filter(e => (e.sourceId||'laserllama') === currentSourceId);
   if (compSection) {
     const catIds = new Set(compCatsInSection().map(c => c.id));
     list = list.filter(e => catIds.has(e.catId));
@@ -3283,7 +3122,7 @@ function compAddEntry() {
   const catId = compFilters.catId || (cats[0] ? cats[0].id : 'origin');
   const id = COMP.nextId++;
   const maxOrd = Math.max(0, ...COMP.entries.filter(e => e.catId === catId).map(e => e.order||0));
-  COMP.entries.push({ id, catId, name: 'Новая запись', nameEn: '', level: null, source: '', chars: '', prof: '', req: '', other: '', body: '', order: maxOrd + 1 });
+  COMP.entries.push({ id, catId, name: 'Новая запись', nameEn: '', level: null, source: '', chars: '', prof: '', req: '', other: '', body: '', order: maxOrd + 1, sourceId: currentSourceId||'laserllama' });
   saveComp(); compOpenId = id; compDetailEdit = true; renderCompBody();
 }
 
@@ -3469,7 +3308,9 @@ function sectionCount(secId, sourceId){
   if (secId === 'maneuvers' || secId === 'styles') {
     const section = secId === 'maneuvers' ? 'maneuvers' : 'traits';
     const catIds = new Set(COMP.categories.filter(c => (c.section||'traits') === section).map(c => c.id));
-    return COMP.entries.filter(e => catIds.has(e.catId)).length;
+    // Заход 17: у Adam появился 2-й реальный источник — записи компендиума теперь скопированы по
+    // sourceId (см. healOrphanCompEntries), поэтому считаем только записи ЭТОГО источника, а не все разом.
+    return COMP.entries.filter(e => catIds.has(e.catId) && (e.sourceId||'laserllama') === sourceId).length;
   }
   return null;
 }
@@ -3534,21 +3375,19 @@ function toggleSourceCard(id){
   card.classList.toggle('expanded');
 }
 
-function renderSourceView(id, section){
+// Заход 17: раньше это была renderSourceView(id, section) — общая для голой ссылки src/<id> (та самая
+// промежуточная страница-источник, которую Adam попросил "вырезать") И для Справочника. Голую ссылку
+// теперь редиректим на главную прямо в routeFromHash(), так что этот рендер остался только для
+// Справочника — соответственно ни название/описание источника, ни ⚙Редактировать/Удалить, ни повторные
+// кнопки 4 разделов (они и так есть в аккордеоне на главной) здесь больше не нужны, чисто "← Назад" + контент.
+function renderReferenceView(id){
   const s = sources.find(x=>x.id===id);
   if(!s){ location.hash=''; return; }
-  document.getElementById('source-title').textContent = s.name;
-  document.getElementById('source-desc').textContent = s.desc||'';
-  const editWrap = document.getElementById('source-edit-wrap');
-  if (editWrap) editWrap.innerHTML = isOwner ? `
-    <button class="nav-menu-btn" onclick="editSourcePrompt('${esc(id)}')" title="Редактировать источник">${ICO.gear} Редактировать</button>
-    <button class="nav-menu-btn" onclick="deleteSource('${esc(id)}')" style="border-color:rgba(180,60,60,0.35);color:#a06060;" title="Удалить источник">Удалить</button>
-  ` : '';
+  document.getElementById('source-title').textContent = 'Справочник · '+s.name;
+  const back = document.getElementById('reference-back-btn');
+  if (back) back.onclick = () => { pendingExpandSourceId = id; location.hash=''; };
   const grid = document.getElementById('source-sections-grid');
-  grid.innerHTML = SOURCE_SECTIONS.map(sec=>`<div class="source-section-btn" onclick="location.hash='src/${esc(id)}/${sec.id}'">${esc(sec.label)}</div>`).join('');
-  if(section==='reference'){
-    grid.innerHTML += `<div class="source-stub" style="grid-column:1/-1">Раздел «Справочник» пока в разработке. Скоро здесь появится контент.</div>`;
-  }
+  grid.innerHTML = `<div class="source-stub" style="grid-column:1/-1">Раздел «Справочник» пока в разработке. Скоро здесь появится контент.</div>`;
 }
 
 function renderNavMenu(){
@@ -3588,8 +3427,16 @@ function routeFromHash(){
   if (m) {
     const srcId = m[1], section = m[2], subPath = m[3];
     currentSourceId = srcId;
-    if (!section || section==='reference') {
-      renderSourceView(srcId, section);
+    if (!section) {
+      // Заход 17: голая ссылка src/<id> (старая промежуточная страница-источник) — Adam: "эта страница
+      // всё ещё существует, надо её вырезать". С захода 11 её роль (кнопки разделов) выполняет аккордеон
+      // на главной, а с захода 13 на нёе никто и не ведёт — но по прямому URL она была всё ещё жива.
+      // Теперь просто уводим на главную с развёрнутой карточкой этого источника.
+      pendingExpandSourceId = srcId;
+      location.hash = '';
+      return;
+    } else if (section==='reference') {
+      renderReferenceView(srcId);
       source.classList.remove('r-hidden');
     } else if (wantsCompendium) {
       // Приёмы/Боевые стили пока ведут в общий компендиум (без фильтра по источнику — известное ограничение)
@@ -3641,16 +3488,15 @@ window.addEventListener('hashchange', routeFromHash);
 
 async function _boot() {
   applyTheme(); // применяем дефолтные переменные; Firestore перетрёт после загрузки
-  loadLayout();
   await Promise.all([load(), loadComp(), loadConfig(), loadSources(), loadHomeLinks()]); // loadConfig() применит тему из Firestore
   loadCustomThemes(); // данные уже в customThemes из loadConfig()
   healOrphanClassCategories();
+  healOrphanCompEntries();
   if (classes.length > 0) activeId = classes[0].id;
   renderSidebar();
   renderMain();
   renderHome();
   renderHomeLinks();
-  initSidebarDrag();
   if (!isOwner) applyROMode();
   routeFromHash(); // показать главную / страницу источника / класс-билдер в зависимости от location.hash
 }
