@@ -14,6 +14,10 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-07 (13) — УБРАНА ПРОМЕЖУТОЧНАЯ СТРАНИЦА-ИСТОЧНИК ИЗ FLOW "← НАЗАД", АВТОСЧЁТЧИК ЗАПИСЕЙ НА КНОПКАХ РАЗДЕЛОВ ГЛАВНОЙ.
+  1) Adam: "когда мы нажимаем назад из классов нас кидает на промежуточную страницу которую надо убрать она не нужна раз мы сделали менюшку уже на главном экране". Кнопка "← Назад" в галерее классов (`#gallery-back-btn`, `renderGalleryHeader()`) раньше вела на `src/<id>` (#source-view — та самая страница с названием/описанием/Редактировать/Удалить/4 кнопки разделов), которая с захода 11 и так стала недостижима с главной, но оставалась единственным местом, куда ещё вёл этот единственный оставшийся путь. Теперь ведёт сразу на главную (`location.hash=''`), причём карточка того источника, откуда ушли, сразу разворачивается (новый глобал `pendingExpandSourceId`, читается в `routeFromHash()` в ветке home) — так что "назад" ощущается как возврат в то же самое раскрытое меню, а не в свёрнутую главную с лишним кликом. `#source-view` не удалён из кода — по прямой ссылке/URL всё ещё открывается, просто из обычной навигации больше никуда не ведёт.
+  2) Автосчётчик записей на кнопках разделов главной (`.home-section-btn`) — Adam ответил на свой же вопрос из захода 11 ("плашки появляются автоматом?"), уточнив что считать: "щас там 2 класса и напротив класса стояло 2 в скобочках". Новая функция `sectionCount(secId, sourceId)`: для 'classes' — реальное число классов источника (`classes.filter(c=>c.category===sourceId)`), для 'maneuvers'/'styles' — число записей соответствующей библиотеки компендиума через существующий `cat.section`. Для 'reference' счётчик не показывается вообще (`null`, не "(0)") — раздел не спроектирован, там физически нет данных для подсчёта. ИЗВЕСТНОЕ ОГРАНИЧЕНИЕ (наследуется от ограничения компендиума): т.к. `COMP.entries` не имеют `sourceId`, счётчики Приёмов/Черт при 2+ источниках будут считать записи ВСЕХ источников разом, а не только текущего — актуально станет при появлении второго реального источника, чинится вместе с тем же ограничением компендиума.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright): клик "Классы (N)" → "← Назад" → главная с уже развёрнутой карточкой источника (не свёрнутая, не source-view); счётчики на всех 3 применимых кнопках совпадают с реальным числом классов/записей библиотек, "Справочник" — без числа. Ошибок в консоли нет.
 2026-09-07 (12) — СВОИ КАРТИНКИ-ЛОГОТИПЫ ДЛЯ ИСТОЧНИКОВ/КЛАССОВ/КАТЕГОРИЙ КОМПЕНДИУМА (вместо/вместе с эмодзи), ПРИГЛУШЁННЫЙ ФИЛЬТР. Adam спросил "картинки наши собственные надо бы вместо эможи... как мне их добавлять?" — выбрал (после уточняющего вопроса) вариант "картинка лежит в его же репозитории рядом с index.html, путь просто вписывается в поле", затем прислал пример (фиолетовый бейдж laserllama) и попросил и для карточек источников/классов тоже, плюс "приглушённая картинка... типа фильтра поверх":
   1) Категории компендиума — новое поле `cat.iconImg` (путь/URL), заполняется в панели категорий (⚙) новым текстовым полем под основной строкой категории (двухрядная карточка `.comp-cat-row1`/`.comp-cat-row2`, т.к. в 300px панели место кончилось) с мини-превью. Новый helper `compCatIconHtml(cat, sizeEm)` — единая точка рендера иконки категории (картинка ИЛИ эмодзи `cat.icon` как фолбэк), используется во всех 3 местах, где раньше был голый `esc(cat.icon)`: заголовок группы в списке, значок записи, шапка детального вида. В `<select>`-дропдаунах (фильтр категорий, выбор категории при добавлении записи) картинку показать нельзя (браузер не рендерит `<img>` внутри `<option>`) — там остался текстовый fallback.
   2) Источники (`sources[].img`) и классы (`classes[].img`) — то же самое поле, тот же принцип. Модальное окно (`#modal`) получило 3-е поле `#modal-inp3` ("Путь к картинке") — `openModal()` теперь принимает необязательный `p3`, `addSourcePrompt`/`editSourcePrompt`/`addClassPrompt` его используют. КСТАТИ, до этого захода у существующего класса вообще не было способа отредактировать название/описание из галереи (только создать новый или зайти внутрь билдера) — добавлена `editClassPrompt(id)` (⚙-иконка на карточке класса, `.class-gallery-edit-btn`, тот же паттерн что у источников) — заодно закрыла этот пробел.
@@ -106,7 +110,8 @@ CHANGELOG (новое сверху):
 - Домашняя страница: карточки источников — СДЕЛАНО 2026-09-07(6). Доп. кнопки-ссылки (Discord и т.п.) — СДЕЛАНО 2026-09-07(7), homeLinks[]/"+ Кнопка".
 - Единая автоматическая палитра классов/подклассов/категорий вместо ручных цветовых пикеров — ЧАСТИЧНО: ручной цвет класса (cls.accentColor/.cls-accent-dot) убран 2026-09-07(9), плашки классовых умений теперь всегда var(--accent). Цвета подклассов (sub.color) и категорий компендиума остаются ручными по прямому запросу Adam (это разные библиотеки/сущности, не тот же кейс).
 - Редизайн .feature-tag (плашки умений в таблице) — СДЕЛАНО 2026-09-07(9) (единый цвет, кроме подклассовых). .ability-card (карточки умений) — ЕЩЁ НЕ СДЕЛАНО.
-- Домашние "плашки" источников с автоматическим счётчиком записей (сейчас — фиксированные подписи SOURCE_SECTIONS без чисел) — требует уточнения у Adam, что именно считать; возможно неактуально теперь, когда Приёмы/Черты — разные библиотеки (считать записи в каждой?).
+- Домашние "плашки" источников с автоматическим счётчиком записей — СДЕЛАНО 2026-09-07(13): sectionCount(), "Классы (N)"/"Приёмы (N)"/"Черты (N)", у "Справочник" числа нет (нечего считать). ОГРАНИЧЕНИЕ: счётчики Приёмов/Черт общие на все источники (COMP.entries без sourceId), не per-источник.
+- "← Назад" из галереи классов вёл на промежуточную #source-view — СДЕЛАНО 2026-09-07(13): теперь сразу на главную с развёрнутой карточкой источника (pendingExpandSourceId). #source-view остаётся в коде рабочей только по прямой ссылке.
 - Пропавшие классы (cls.category не совпадал с currentSourceId из-за старого ручного поля-папки) — СДЕЛАНО 2026-09-07(11), healOrphanClassCategories() в _boot(). ОГРАНИЧЕНИЕ: работает только если источник ровно один — при 2+ источниках чинить некому (нельзя угадать, какому источнику принадлежит осиротевший класс), нужен отдельный ручной инструмент, когда появится второй реальный источник.
 - Поиск/сортировка в галерее классов — УБРАНЫ ПОЛНОСТЬЮ 2026-09-07(11) по прямому запросу Adam (не просто скрыты).
 - Главная — переход по клику на карточку источника заменён на разворачивание карточки на месте (аккордеон) — СДЕЛАНО 2026-09-07(11), toggleSourceCard()/.expanded. #source-view (страница-источник) осталась в коде рабочей по прямой ссылке, просто с главной больше не достижима.
@@ -701,6 +706,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-source-card.expanded .home-source-sections{max-height:200px;opacity:1;margin-top:14px;}
 .home-section-btn{font-size:0.78em;font-family:var(--font);color:var(--accent);background:rgba(78,122,92,0.1);border:1px solid rgba(78,122,92,0.32);border-radius:var(--radius-sm);padding:6px 13px;letter-spacing:0.02em;cursor:pointer;transition:all .15s;}
 .home-section-btn:hover{border-color:var(--accent);background:rgba(78,122,92,0.22);color:var(--gold2);}
+.home-section-count{opacity:0.6;font-size:0.92em;}
 .home-source-card.soon{opacity:0.45;cursor:default;border-style:dashed;}
 .home-source-card.soon:hover{background:var(--panel);border-color:var(--border);}
 .home-source-card.soon:hover::before{opacity:0;}
@@ -968,7 +974,7 @@ const SLOT_DATA={
 /* STATE */
 let classes=[], activeId=null, dragSrc=null, activeSubId=null, modalMode='class';
 /* ИСТОЧНИКИ (новая навигация Источник→Раздел) */
-let sources=[], currentSourceId=null, editingSourceId=null, editingClassId=null;
+let sources=[], currentSourceId=null, editingSourceId=null, editingClassId=null, pendingExpandSourceId=null;
 const SOURCE_SECTIONS=[
   {id:'classes', label:'Классы'},
   {id:'maneuvers', label:'Приёмы'},
@@ -3361,6 +3367,23 @@ loadTableFs(); applyTableFs();
    #classes → показать #app-view (сайдбар+класс-билдер), иначе (пусто/#home) → #home-view.
    Не трогает Firestore/save/render логику — просто show/hide двух верхнеуровневых div. */
 /* ---------- ГЛАВНАЯ / ИСТОЧНИК / МЕНЮ — рендеры ---------- */
+// Заход 13: автосчётчик записей на кнопках разделов главной ("Классы (2)" и т.д.) — Adam попросил
+// после вопроса из захода 11 ("плашки появляются автоматом?"), теперь уточнил что именно считать.
+// 'classes' — реальные классы этого источника. 'maneuvers'/'styles' — записи соответствующей
+// библиотеки компендиума. ИЗВЕСТНОЕ ОГРАНИЧЕНИЕ (см. память): COMP.entries не имеют sourceId,
+// поэтому при 2+ источниках счётчик Приёмов/Черт будет считать записи ВСЕХ источников разом, а не
+// только этого — то же ограничение, что и у самого компендиума. 'reference' — стаб без данных,
+// счётчик не показываем вообще (null), а не "(0)", чтобы не путать с "проверено, пусто".
+function sectionCount(secId, sourceId){
+  if (secId === 'classes') return classes.filter(c => (c.category||'') === sourceId).length;
+  if (secId === 'maneuvers' || secId === 'styles') {
+    const section = secId === 'maneuvers' ? 'maneuvers' : 'traits';
+    const catIds = new Set(COMP.categories.filter(c => (c.section||'traits') === section).map(c => c.id));
+    return COMP.entries.filter(e => catIds.has(e.catId)).length;
+  }
+  return null;
+}
+
 function renderHome(){
   const grid=document.getElementById('home-sources-grid');
   if(!grid || !sources.length) return; // данные ещё не загрузились — статичный фолбэк из HTML остаётся как есть
@@ -3371,7 +3394,10 @@ function renderHome(){
       <div class="home-source-name">${esc(s.name)}</div>
       <div class="home-source-desc">${esc(s.desc||'')}</div>
       <div class="home-source-sections" id="home-src-sections-${esc(s.id)}">
-        ${SOURCE_SECTIONS.map(sec=>`<div class="home-section-btn" onclick="event.stopPropagation();location.hash='src/${esc(s.id)}/${sec.id}'">${esc(sec.label)}</div>`).join('')}
+        ${SOURCE_SECTIONS.map(sec=>{
+          const cnt = sectionCount(sec.id, s.id);
+          return `<div class="home-section-btn" onclick="event.stopPropagation();location.hash='src/${esc(s.id)}/${sec.id}'">${esc(sec.label)}${cnt!=null?` <span class="home-section-count">(${cnt})</span>`:''}</div>`;
+        }).join('')}
       </div>
     </div>`).join('');
   html += isOwner
@@ -3472,6 +3498,14 @@ function routeFromHash(){
     currentSourceId = null;
     renderHome();
     home.classList.remove('r-hidden');
+    // Заход 13: если сюда пришли по кнопке "← Назад" из галереи классов (см. renderGalleryHeader) —
+    // сразу разворачиваем карточку того источника, откуда ушли, вместо того чтобы показывать
+    // свёрнутую главную и заставлять пользователя кликать по карточке ещё раз.
+    if (pendingExpandSourceId) {
+      const sid = pendingExpandSourceId; pendingExpandSourceId = null;
+      const card = document.querySelector(`.home-source-card[data-src-id="${CSS.escape(sid)}"]`);
+      if (card) { card.classList.add('expanded'); card.scrollIntoView({block:'center'}); }
+    }
   }
   renderNavMenu();
 }
@@ -3480,7 +3514,10 @@ function renderGalleryHeader(srcId){
   const s = sources.find(x=>x.id===srcId);
   document.getElementById('gallery-title').textContent = 'Классы' + (s?' · '+s.name:'');
   const back = document.getElementById('gallery-back-btn');
-  if (back) back.onclick = () => { location.hash = 'src/'+encodeURIComponent(srcId); };
+  // Заход 13: раньше "← Назад" вёл на промежуточную страницу-источник (#source-view) — Adam указал,
+  // что она больше не нужна, т.к. её роль (кнопки разделов) теперь выполняет аккордеон на главной
+  // (заход 11). Теперь ведёт сразу на главную, с разворачиванием карточки нужного источника.
+  if (back) back.onclick = () => { pendingExpandSourceId = srcId; location.hash=''; };
 }
 window.addEventListener('hashchange', routeFromHash);
 
