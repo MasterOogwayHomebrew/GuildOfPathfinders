@@ -14,6 +14,19 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-08 (20) — ДОРАБОТКА КАРТОЧЕК УМЕНИЙ ПО ГОЛОСОВОМУ ОПИСАНИЮ + КОНТЕКСТНОЕ МЕНЮ ТАБЛИЦЫ + РЕАЛТАЙМ-ФИКС + ДЕКОР + РАЗДЕЛИТЕЛЬ ПЕРЕВОДА. Заход по развёрнутому голосовому сообщению Adam (много пунктов сразу).
+  1) Карточки умений (`.ability-card`) — убраны `border-left`/`border-top` полностью (было: цветная левая рамка + разделительная линия между соседними умениями внутри группы уровня) — текст умения теперь визуально "на странице", а не в отдельном окошке, как явно просил Adam ("убрать рамочки... чтобы текст был не в этих окошках а на странице"). Обёртка `.ab-level-group` (спойлер уровня, залитый фон/рамка) — НЕ трогал, её просил оставить как есть. Цвет названия умения без подкласса (`.ab-name-disp`) — `var(--accent)` (зеленоватый, сливался с зелёными плашками `.feature-tag` в таблице) → `var(--gold2)` (золотой); умения с цветом подкласса по-прежнему красятся в `sub.color` — не менялось.
+  2) Плашка заголовка уровня (`.ab-level-header`) — убран отдельный `.ab-level-badge` (квадратик с цифрой уровня отдельно от текста "Уровень N" — дублирование, на которое жаловался Adam: "стоит тут единичка потом идёт уровень и один"). Остался один цельный `.ab-level-title` = "Уровень N", чуть крупнее и на var(--gold2) — раньше был просто var(--text).
+  3) Кнопка "+ Добавить умение" (`.add-ab-btn`) внизу списка умений — УДАЛЕНА полностью (markup+CSS+print-режим правило). Функция `addAbility()` переименована/переработана в `addAbilityAtLevel(lv,name)` — теперь вызывается из нового контекстного меню таблицы (см. п.4), название умения указывается сразу в модалке, без прокрутки вниз к списку умений — ровно как просил Adam.
+  4) НОВОЕ: контекстное меню (ПКМ) на таблице класса — Adam: "дай мне возможность на правую кнопку добавить умение на том месте на которое я навёлся... а если нажимаю на существующее — там написано удалить". ПКМ по строке уровня (`<tr data-lv>`, `showLvCtxMenu()`) → пункт "Добавить умение" → модалка `modalMode='newAbLv'` (поле названия) → `addAbilityPrompt(lv)`→`addAbilityAtLevel(lv,v1)`, умение сразу создаётся с введённым названием на этом уровне, группа уровня форс-открывается. ПКМ по плашке умения в таблице (`.feature-tag[data-ab-id]`, `showTagCtxMenu()`, включая плашки умений подклассов через `linkedAb.id`) → пункт "Удалить умение" (danger) → `delAb(abId)` напрямую (без доп. confirm — как и кнопка ✕ в самой карточке умения, консистентно с уже существующим поведением). Переиспользован существующий `#ctx-menu` (тот же, что у редактора описаний) и общий паттерн позиционирования (вынесен в `positionCtxMenu()`). Оба обработчика — owner-only (`if(!isOwner)return`).
+  5) БАГ реалтайм-обновления: смена уровня умения подкласса через поле "Уровни получения умений подкласса" (`updateSubLv(id,'lv',val)`) меняла `ab.lv` и таблицу (`reTable()`), но НЕ список умений (`#abilities-list`) — Adam: "не сразу перемещается наверх, оно перемещается только после того как я закрою-открою подкласс или обновлю страницу". Добавлен точечный ре-рендер `#abilities-list` + форс-открытие новой группы уровня сразу в `updateSubLv()`, по аналогии с уже существующей логикой в `updAb()`.
+  6) Декоративные золотые звёзды (4-конечная "sparkle"-звезда с вогнутыми гранями, инлайн SVG, путь как у Lucide "sparkle") — добавлены по бокам текста "Гильдия Путеискателей" в двух местах, как просил Adam: `.home-title` (главная страница, статичная разметка) и `.action-bar-title` (шапка класс-билдера, оба места рендера в `renderMain()`, через новую `ICO.star`). Новый общий класс `.title-star` — размер в `em` от родителя, поэтому автоматически масштабируется и на крупном `.home-title` (2.1em), и на мелком `.action-bar-title`.
+  7) Кнопка "Главная" в боковом меню-drawer (`renderNavMenu()`) — была обычным пунктом `.nav-menu-item` (плоский, без рамки, как остальные пункты меню), Adam попросил визуально уравнять с кнопкой "Назад" (`.source-home-link`). Теперь использует тот же класс `.source-home-link` (рамка/паддинг/hover как у "Назад"), с новой иконкой домика `ICO.home` вместо стрелки — тот же СТИЛЬ кнопки, но своя иконка+текст (это переход на главную, а не "на уровень назад"), растянута на всю ширину drawer'а.
+  8) Пустое поле эмодзи/буквы категории компендиума (`cat.icon`) — раньше при пустом поле показывался плейсхолдер "?" (`compCatIconHtml()`), Adam: "если поле пустое пусть будет пусто, не будет вопросиков". Фолбэк убран, пустое поле = пустая иконка.
+  9) НОВОЕ: стиль и цвет разделителя RU/EN в редакторе описаний умений (`.ab-body-ce`, контекстное меню, было — просто "Разделитель" вставлял голый `<hr>`) — Adam: "между русским и английским пусть будет один красивый золотистый разделитель... дай возможность менять стиль (жирный/тонкий/затухающий) и цвет". Быстрый клик "Разделитель" по-прежнему вставляет `<hr>` одним кликом (теперь золотой по умолчанию — `.rt-div.rt-div-thin`, цвет берётся из активной темы `var(--gold)`, а не хардкод-хекс, чтобы не ломался при смене темы). Новый пункт "Стиль разделителя ▸" раскрывает мини-панель: 3 варианта (Тонкий/Жирный/Затухающий — `.rt-div-thin/bold/fading`, затухающий через `linear-gradient`) + пикер цвета (`applyDividerColorFromInput`, сохраняется в сессионной переменной `lastDividerColor` и переиспользуется для следующих вставок, включая быстрый клик). Старые `<hr>` без класса (уже вставленные ранее) визуально НЕ затронуты — правило `.ab-body-ce hr{border-top:1px solid var(--border)}` оставлено как было, новый золотой стиль только у `<hr class="rt-div ...">`.
+  10) Изучение next.dnd.su / TTG-Club (новая редакция) на предмет UI-идей — Adam попросил "посети сайты и подсмотри что-то полезное". Не выполнено в этом заходе — вернуться отдельным шагом (не блокирует остальные пункты).
+  ПОПУТНО: перевод предметов/оружия/брони с next.dnd.su/equipment (было "ОТКРЫТО" в заходе 19) — ЗАВЕРШЁН в персистентной памяти Claude (не в этом файле, см. areas/class-builder-architecture.md / topics/dnd-glossary.md) отдельным шагом того же дня, до начала этого захода правок сайта.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, новый qa_r19.js + полный регресс qa_backbtn.js/qa_sections.js/qa_mobgap.js): отсутствие рамок у ability-card, золотой цвет названия, объединённый заголовок уровня без бейджа, отсутствие add-ab-btn, ПКМ по строке таблицы → модалка → умение создаётся с введённым названием на нужном уровне с форс-открытием группы, ПКМ по плашке в таблице → удаление умения, реалтайм-ре-рендер списка при смене уровня умения подкласса, панель стиля разделителя открывается и вставляет `<hr class="rt-div rt-div-fading">`, пустая иконка категории возвращает `""` без "?", звёзды у заголовка (2 шт в `.home-title`, 2 шт в `.action-bar-title`), кнопка "Главная" в drawer'е — та же рамка что у "Назад" с SVG-иконкой — везде 0 ошибок в консоли (кроме ожидаемых `ERR_TUNNEL_CONNECTION_FAILED` от Google Fonts CDN в изолированной тестовой среде без сети — не баг приложения).
 2026-09-08 (19) — МОБИЛЬНЫЙ ФИКС ТОПБАРА + КАСТОМНЫЕ СТРЕЛКИ НАЗАД + РЕДИЗАЙН КАРТОЧЕК УМЕНИЙ ПО УРОВНЯМ + СВОБОДНЫЕ РАЗДЕЛЫ ИСТОЧНИКА. Заход по 5 мобильным скриншотам Adam + отдельный запрос на редизайн умений + архитектурная переделка источников (после уточняющего вопроса).
   1) БАГ "невидимый топбар" на мобильной главной и в библиотеках (галерея источников/классы) — Adam: "главная страница видео сверху как будто там не видимый топ бар, далее в библиотеках также как будто на верху невидимый топбар". Причина: `body{padding-top:44px}` резервировал место под `#mob-topbar` ГЛОБАЛЬНО, а `#mob-topbar` физически лежит внутри `#app-view` (класс-билдер) — на других топ-уровневых экранах (`#home-view`, `#screen-compendium`, `#classes-gallery-view`) этого топбара просто нет, но пустой отступ 44px оставался, создавая "невидимый бар"-пустоту сверху. Фикс: `padding-top:44px` перенесён с `body` на `#app-view` (единственное место, где топбар реально есть). Заодно найден и убран дублирующий МЁРТВЫЙ `@media(max-width:768px){#screen-compendium{padding-top:44px;}}` — та же ошибка, а `.comp-topbar` там самодостаточен (свой "☰ Меню").
   2) Кнопки "← Назад"/"На главную" — Adam: "кнопки на главну и назад надо сделать больше и стрелки сделать кастомные а не то что там есть". Добавлена новая иконка `ICO.back` (SVG-стрелка, тот же стиль что остальные `ICO.*`). Заменены текстовые "←"/"◀" на `${ICO.back}` в 4 местах: `#reference-back-btn`, `#gallery-back-btn` (статичная HTML-разметка — SVG продублирован литералом, т.к. `${ICO.*}` доступен только в JS-шаблонах), и 2× `.comp-detail-back` (JS-шаблон `renderCompBody()`). Кнопки укрупнены: добавлена рамка `border:1px solid var(--border)` (hover → var(--gold)), padding увеличен, font-weight:600 — теперь это настоящие кнопки, а не текстовые ссылки. Классы: `.comp-detail-back`, `.source-home-link`.
@@ -323,16 +336,13 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-level-group{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.2);}
 .ab-level-header{display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;user-select:none;}
 .ab-level-header:hover{background:rgba(255,255,255,0.03);}
-.ab-level-badge{font-family:var(--font-head);font-size:0.95em;color:var(--accent);background:var(--panel2);border:1px solid var(--accent);border-radius:var(--radius-sm);min-width:26px;text-align:center;padding:2px 4px;flex-shrink:0;font-weight:700;letter-spacing:0.4px;}
-.ab-level-title{font-family:var(--font-head);font-size:1em;font-weight:600;letter-spacing:0.4px;color:var(--text);flex:1;}
+.ab-level-title{font-family:var(--font-head);font-size:1.02em;font-weight:700;letter-spacing:0.6px;color:var(--gold2);flex:1;}
 .ab-level-count{font-size:0.75em;color:var(--muted);background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:var(--radius-pill);padding:1px 8px;flex-shrink:0;}
 .ab-level-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;}
 .ab-level-group.open .ab-level-toggle{transform:rotate(90deg);}
-.ab-level-body{display:none;flex-direction:column;border-top:1px solid var(--border);}
+.ab-level-body{display:none;flex-direction:column;border-top:1px solid var(--border);padding:2px 0;}
 .ab-level-group.open .ab-level-body{display:flex;}
-.ability-card{border-left:1px solid var(--border);}
-.ability-card:not(:first-child){border-top:1px solid var(--border);}
-.ability-header{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 14px;cursor:pointer;user-select:none;}
+.ability-header{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;user-select:none;}
 .ability-header:hover{background:rgba(255,255,255,0.02);}
 .drag-handle{display:none;}
 .ab-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;margin-left:auto;}
@@ -348,7 +358,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-btn{font-size:0.77em;padding:3px 6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .ab-btn:hover{border-color:var(--gold);color:var(--gold);}
 .ab-btn.del:hover{border-color:#c06060;color:#c06060;}
-.ability-body-wrap{display:none;padding:0 10px 10px 14px;}
+.ability-body-wrap{display:none;padding:0 14px 12px 14px;}
 .ability-card.open .ability-body-wrap{display:block;}
 
 /* Rich text editor */
@@ -366,6 +376,13 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-body-ce ul,.ab-body-ce ol{padding-left:18px;margin:2px 0;}
 .ab-body-ce li{margin:1px 0;}
 .ab-body-ce hr{border:none;border-top:1px solid var(--border);margin:6px 0;}
+.ab-body-ce hr.rt-div{border:none;height:2px;border-radius:2px;margin:10px 0;background:var(--rt-div-color,var(--gold));}
+.ab-body-ce hr.rt-div.rt-div-thin{height:1px;}
+.ab-body-ce hr.rt-div.rt-div-bold{height:3px;}
+.ab-body-ce hr.rt-div.rt-div-fading{height:1px;background:linear-gradient(90deg,transparent,var(--rt-div-color,var(--gold)) 50%,transparent);}
+.ctx-div-opts{display:flex;gap:6px;padding:4px 14px 8px;}
+.ctx-div-opt{flex:1;height:24px;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--border);color:var(--gold);cursor:pointer;border-radius:var(--radius-sm);transition:all .15s;font-size:0.8em;}
+.ctx-div-opt:hover{border-color:var(--gold);background:rgba(158,124,50,0.12);}
 
 /* Tables inside editor */
 .ab-body-ce table.ce-table{border-collapse:collapse;margin:6px 0;width:100%;}
@@ -401,8 +418,6 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ctx-sep{height:1px;background:var(--border);margin:3px 0;}
 .ctx-icon{width:20px;text-align:center;opacity:0.7;font-size:0.85em;}
 
-.add-ab-btn{margin-top:8px;padding:8px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:0.77em;letter-spacing:2px;transition:all .15s;width:100%;font-family:var(--font);border-radius:var(--radius-sm);}
-.add-ab-btn:hover{border-color:var(--gold);color:var(--gold);}
 .scale-ctrl{display:flex;align-items:center;gap:4px;}
 .scale-val{font-size:0.77em;color:var(--muted);min-width:34px;text-align:center;}
 
@@ -698,7 +713,9 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 0%,rgba(78,122,92,0.12),transparent 70%);pointer-events:none;}
 .home-emblem{width:64px;height:64px;opacity:0.9;margin-bottom:14px;}
 .home-emblem svg{width:100%;height:100%;}
-.home-title{font-family:var(--font-display);font-size:2.1em;font-weight:700;color:var(--gold2);letter-spacing:0.02em;line-height:1.15;text-wrap:balance;margin-bottom:8px;}
+.home-title{font-family:var(--font-display);font-size:2.1em;font-weight:700;color:var(--gold2);letter-spacing:0.02em;line-height:1.15;text-wrap:balance;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:14px;}
+.title-star{display:inline-block;width:0.5em;height:0.5em;flex-shrink:0;color:var(--gold);vertical-align:-0.05em;}
+.action-bar-title .title-star{width:0.55em;height:0.55em;margin:0 9px;vertical-align:-0.08em;}
 .home-subtitle{font-family:var(--font);font-size:1.05em;font-style:normal;font-weight:400;color:var(--text);opacity:0.82;letter-spacing:0.02em;margin-bottom:18px;}
 .home-badge{display:inline-flex;align-items:center;gap:6px;font-size:0.7em;font-family:var(--font);letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);background:rgba(158,124,50,0.12);border:1px solid rgba(158,124,50,0.3);border-radius:var(--radius-pill);padding:4px 14px;}
 /* Доп. кнопки-ссылки на главной (Discord и любые другие внешние ссылки, admin-addable — см. homeLinks/renderHomeLinks) */
@@ -792,6 +809,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .nav-menu-item:hover{background:rgba(158,124,50,0.08);color:var(--gold2);}
 .nav-menu-item.active{border-left-color:var(--gold);color:var(--gold2);background:rgba(158,124,50,0.1);}
 .nav-menu-sep{height:1px;background:var(--border);margin:10px 18px;}
+.nav-menu-home-row{padding:0 18px 12px;}
+.nav-home-btn{margin:0!important;width:100%;justify-content:center;}
 .action-bar-title{cursor:pointer;}
 </style>
 <!-- Firebase SDK -->
@@ -808,7 +827,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <div id="home-view">
   <div class="home-hero">
     <div class="home-emblem"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--gold)" stroke-opacity=".4" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--gold)" stroke-opacity=".2" stroke-width="1"/><circle cx="32" cy="32" r="12" stroke="var(--gold)" stroke-opacity=".15" stroke-width=".8"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--gold)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--gold)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--gold)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--gold)" fill-opacity=".5"/><path d="M50 14L40 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 50L24 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 14L24 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M50 50L40 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><circle cx="32" cy="32" r="5" fill="var(--accent)" fill-opacity=".6"/><circle cx="32" cy="32" r="2.5" fill="var(--gold2)" fill-opacity=".9"/></svg></div>
-    <h1 class="home-title">Гильдия Путеискателей</h1>
+    <h1 class="home-title"><svg class="title-star" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>Гильдия Путеискателей<svg class="title-star" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg></h1>
     <p class="home-subtitle">Переводы хомбрю-материалов для Dungeons &amp; Dragons 5e</p>
     <div class="home-badge">Неофициальные переводы</div>
     <div class="home-links-row" id="home-links-row"></div>
@@ -965,7 +984,9 @@ const ICO = {
   search:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="vertical-align:-2px"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg>',
   palette:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 3a9 8 0 1 0 0 16c1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H16a4 4 0 0 0 4-4c0-4.4-3.6-6-8-6Z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
   link:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M14 5h5v5"/><path d="M19 5 10 14"/><path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
-  back:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>'
+  back:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>',
+  home:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>',
+  star:'<svg class="title-star" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>'
 };
 firebase.initializeApp(_FB_CONFIG);
 var db = firebase.firestore();
@@ -1289,6 +1310,9 @@ function cloneClass(){
 
 /* Foreground color in CE */
 let savedForeRange=null; // saved selection for foreColor after picker opens
+/* Разделитель RU/EN в переводах (заход 20): стиль/цвет запоминаются между вставками в рамках сессии,
+   цвет по умолчанию null → берётся var(--gold) активной темы (а не хардкод-хекс). */
+let lastDividerStyle='thin', lastDividerColor=null;
 function showCtxColorGrid(){
   const panel=document.getElementById('ctx-color-panel');
   if(panel) panel.style.display=panel.style.display==='none'?'block':'none';
@@ -1505,7 +1529,6 @@ function applyROMode() {
     '.ab-btn.del{display:none!important;}' +
     '.ab-type-in{display:none!important;}' +
     '.ab-sub-sel{display:none!important;}' +
-    '.add-ab-btn{display:none!important;}' +
     /* subclasses */
     '.add-sub-btn{display:none!important;}' +
     '.sub-del-btn{display:none!important;}' +
@@ -1697,6 +1720,11 @@ function modalOk(){
     const cls=getActive(); if(!cls)return;
     cls.subclasses.push({id:Date.now(),name:v1,desc:v2||''});
     save(); closeModal(); renderMain();
+  } else if(modalMode==='newAbLv'){
+    const cls=getActive(); const lv=modalTargetLv; modalTargetLv=null;
+    if(!cls||lv==null){ closeModal(); return; }
+    closeModal();
+    addAbilityAtLevel(lv,v1);
   } else if(modalMode==='col'){
     const cls=getActive(); if(!cls)return;
     const cid='col_'+Date.now();
@@ -1879,7 +1907,7 @@ function renderLvRow(cls,lv,normalCols,casterCols){
   const tags=(lv.features||[]).map((f,fi)=>{
     const abId=featureAbIds[fi];
     if(abId!=null && abId>0){
-      return `<span class="feature-tag" draggable="true" data-ab-id="${abId}">${esc(f)}</span>`;
+      return `<span class="feature-tag" draggable="true" data-ab-id="${abId}" oncontextmenu="showTagCtxMenu(event,${abId})">${esc(f)}</span>`;
     } else if(abId!=null && abId<0){
       const sl=(cls.subLevels||[]).find(x=>x.id===-abId);
       const sub=sl?(cls.subclasses||[]).find(s=>s.id===sl.subId):null;
@@ -1887,13 +1915,14 @@ function renderLvRow(cls,lv,normalCols,casterCols){
       const s=sc?`background:${sc}1a;border-color:${sc}44;color:${sc};`:'';
       const linkedAb=sl?(cls.abilities||[]).find(a=>a.slvId===sl.id):null;
       const subDat=linkedAb?` data-ab-id="${linkedAb.id}"`:''
-      if(f) return `<span class="feature-tag sub-tag"${subDat} style="${s}">${esc(f)}</span>`;
-      return `<span class="feature-tag sub-tag"${subDat} style="${s}">Умение подкласса</span>`;
+      const subCtx=linkedAb?` oncontextmenu="showTagCtxMenu(event,${linkedAb.id})"`:'';
+      if(f) return `<span class="feature-tag sub-tag"${subDat}${subCtx} style="${s}">${esc(f)}</span>`;
+      return `<span class="feature-tag sub-tag"${subDat}${subCtx} style="${s}">Умение подкласса</span>`;
     } else {
       return `<span class="feature-tag sub-tag">Умение подкласса</span>`;
     }
   }).join('');
-  return `<tr data-lv="${lv.lv}">
+  return `<tr data-lv="${lv.lv}" oncontextmenu="showLvCtxMenu(event,${lv.lv})">
     <td class="lv-num">${lv.lv}</td>
     <td><input class="lv-input" value="${esc(lv.prof)}" oninput="updLv(${lv.lv},'prof',this.value)"></td>
     <td><div class="feature-tags">${tags}</div></td>
@@ -1949,10 +1978,8 @@ function renderAbilities(cls){
       const bodyHtml=a.body||'';
       const sub=a.subId?subMap[a.subId]:null;
       const sc=sub?.color||null;
-      const borderStyle=sc?`border-left-color:${sc};`:`border-left-color:var(--accent);`;
-      const bgStyle=sc?`background:${sc}0d;`:'';
-      const nameColor=sc?sc:'var(--accent)';
-      return `<div class="ability-card${a.open?' open':''}" data-id="${a.id}" style="${borderStyle}${bgStyle}">
+      const nameColor=sc?sc:'var(--gold2)';
+      return `<div class="ability-card${a.open?' open':''}" data-id="${a.id}">
         <div class="ability-header" onclick="abHeaderClick(event,${a.id})">
           <span class="drag-handle" onclick="event.stopPropagation()">⠿</span>
           <span class="ab-name-wrap">
@@ -1975,8 +2002,7 @@ function renderAbilities(cls){
       </div>`;
     }).join('');
     return `<div class="ab-level-group${isOpen?' open':''}" data-lv-key="${key}">
-      <div class="ab-level-header" onclick="toggleAbLevelGroup(${cls.id},${g.lv})">
-        <span class="ab-level-badge">${g.lv||'—'}</span>
+      <div class="ab-level-header" onclick="toggleAbLevelGroup(${cls.id},${g.lv})" oncontextmenu="showLvCtxMenu(event,${g.lv})">
         <span class="ab-level-title">Уровень ${g.lv||'—'}</span>
         <span class="ab-level-count">${g.items.length}</span>
         <span class="ab-level-toggle">▸</span>
@@ -2115,7 +2141,7 @@ function renderMain(){
     main.innerHTML=`
 <div class="action-bar">
   <button class="nav-menu-btn nav-toggle-btn" onclick="toggleNavMenu()" title="Меню навигации">${ICO.menu} Меню</button>
-  <span class="action-bar-title" onclick="location.hash=''" title="На главную">Гильдия Путеискателей</span>
+  <span class="action-bar-title" onclick="location.hash=''" title="На главную">${ICO.star}Гильдия Путеискателей${ICO.star}</span>
   <a class="act-btn" href="https://discord.gg/WXRnWaZ7K" target="_blank" rel="noopener noreferrer" title="Дискорд сервер" style="border-color:rgba(158,124,50,0.4);color:var(--gold2);text-decoration:none;">${ICO.chat} Discord</a>
   ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(180,60,60,0.35);color:#a06060;">${ICO.exit} Выйти</button>` : ''}
   ${_settingsHtml()}
@@ -2130,7 +2156,7 @@ function renderMain(){
   main.innerHTML=`
 <div class="action-bar">
   <button class="nav-menu-btn nav-toggle-btn" onclick="toggleNavMenu()" title="Меню навигации">${ICO.menu} Меню</button>
-  <span class="action-bar-title" onclick="location.hash=''" title="На главную">Гильдия Путеискателей</span>
+  <span class="action-bar-title" onclick="location.hash=''" title="На главную">${ICO.star}Гильдия Путеискателей${ICO.star}</span>
 
   <a class="act-btn" href="https://discord.gg/WXRnWaZ7K" target="_blank" rel="noopener noreferrer" title="Дискорд сервер" style="border-color:rgba(158,124,50,0.4);color:var(--gold2);text-decoration:none;">${ICO.chat} Discord</a>
   ${isOwner ? `<button class="act-btn" onclick="fbLogin()" title="Выйти из режима редактора" style="border-color:rgba(180,60,60,0.35);color:#a06060;">${ICO.exit} Выйти</button>` : ''}
@@ -2189,7 +2215,6 @@ function renderMain(){
     <div class="section">
       <div class="section-title abilities-title">Классовые умения</div>
       <div class="abilities-list" id="abilities-list">${renderAbilities(cls)}</div>
-      <button class="add-ab-btn" onclick="addAbility()">+ Добавить умение</button>
     </div>
   </div>
 </div>`;
@@ -2222,11 +2247,10 @@ function toggleAb(id){
   const a=cls.abilities.find(x=>x.id===id); if(a)a.open=!a.open; save();
   document.querySelector(`.ability-card[data-id="${id}"]`)?.classList.toggle('open');
 }
-function addAbility(){
+function addAbilityAtLevel(lv,name){
   const cls=getActive(); if(!cls)return;
   const id=Date.now();
-  const lv=1;
-  cls.abilities.push({id,lv,name:'Новое умение',type:'Пассивная',subId:activeSubId,body:'',open:true,slvId:null});
+  cls.abilities.push({id,lv,name:name||'Новое умение',type:'Пассивная',subId:activeSubId,body:'',open:true,slvId:null});
   syncFeatures(cls); save();
   abGroupOpen[cls.id+':'+lv]=true;
   const list=document.getElementById('abilities-list');
@@ -2236,6 +2260,39 @@ function addAbility(){
     const card=document.querySelector(`.ability-card[data-id="${id}"]`);
     if(card){card.scrollIntoView({behavior:'smooth',block:'center'});}
   },100);
+}
+/* Контекстное меню таблицы уровней (заход 20): ПКМ по строке — добавить умение на этот уровень
+   (название сразу через модал, без прокрутки вниз), ПКМ по плашке умения в таблице — удалить. */
+let modalTargetLv=null;
+function addAbilityPrompt(lv){
+  modalTargetLv=lv;
+  openModal('Новое умение на уровне '+lv,'Название умения...','','Добавить','newAbLv');
+}
+function positionCtxMenu(e){
+  const menu=document.getElementById('ctx-menu');
+  let x=e.clientX, y=e.clientY;
+  menu.style.left='0'; menu.style.top='0'; menu.style.display='block';
+  const mw=menu.offsetWidth, mh=menu.offsetHeight;
+  menu.style.display='';
+  if(x+mw>window.innerWidth-4)x=window.innerWidth-mw-4;
+  if(y+mh>window.innerHeight-4)y=window.innerHeight-mh-4;
+  menu.style.left=x+'px'; menu.style.top=y+'px';
+}
+function showLvCtxMenu(e,lv){
+  e.preventDefault();
+  if(!isOwner)return;
+  const menu=document.getElementById('ctx-menu');
+  menu.innerHTML=`<div class="ctx-item" onmousedown="event.preventDefault();hideCtxMenu();addAbilityPrompt(${lv})"><span class="ctx-icon">+</span>Добавить умение</div>`;
+  menu.classList.add('vis');
+  positionCtxMenu(e);
+}
+function showTagCtxMenu(e,abId){
+  e.preventDefault(); e.stopPropagation();
+  if(!isOwner || !abId)return;
+  const menu=document.getElementById('ctx-menu');
+  menu.innerHTML=`<div class="ctx-item danger" onmousedown="event.preventDefault();hideCtxMenu();delAb(${abId})"><span class="ctx-icon">✕</span>Удалить умение</div>`;
+  menu.classList.add('vis');
+  positionCtxMenu(e);
 }
 function delAb(id){
   const cls=getActive(); if(!cls)return;
@@ -2287,6 +2344,13 @@ function updateSubLv(id,key,val){
   if(key==='lv' && ab) ab.lv=val;
   if(key==='label' && ab) ab.name=val||'Умение подкласса';
   syncFeatures(cls); save(); reTable();
+  // Заход 20: список умений раньше не обновлялся сразу при смене уровня умения подкласса —
+  // требовалось закрыть/открыть подкласс или обновить страницу. Теперь ре-рендерим сразу.
+  if(key==='lv'){
+    abGroupOpen[cls.id+':'+val]=true;
+    const list=document.getElementById('abilities-list');
+    if(list){list.innerHTML=renderAbilities(cls);}
+  }
 }
 function deleteSubLv(id){
   const cls=getActive(); if(!cls)return;
@@ -2570,6 +2634,15 @@ function showCtxMenu(e,el){
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertUnorderedList')"><span class="ctx-icon">≡</span>Список</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertOrderedList')"><span class="ctx-icon">①</span>Нумер. список</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();insertCeHr()"><span class="ctx-icon">—</span>Разделитель</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxDividerPanel()"><span class="ctx-icon">◈</span>Стиль разделителя ▸</div>`;
+  html+=`<div id="ctx-divider-panel" style="display:none">
+    <div class="ctx-div-opts">
+      <div class="ctx-div-opt" onmousedown="event.preventDefault();insertCeHr('thin')" title="Тонкий">▬</div>
+      <div class="ctx-div-opt" style="font-weight:900" onmousedown="event.preventDefault();insertCeHr('bold')" title="Жирный">▬</div>
+      <div class="ctx-div-opt" onmousedown="event.preventDefault();insertCeHr('fading')" title="Затухающий">╌</div>
+    </div>
+    <label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">${ICO.palette}</span> Цвет разделителя...<input type="color" class="color-input-overlay" value="${lastDividerColor||'#9e7c32'}" onchange="applyDividerColorFromInput(this)"></label>
+  </div>`;
   html+=`<div class="ctx-sep"></div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertTable()"><span class="ctx-icon">▦</span>Вставить таблицу</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertDiceTable()"><span class="ctx-icon">🎲</span>Таблица бросков</div>`;
@@ -2608,9 +2681,20 @@ document.addEventListener('click',e=>{
 });
 
 /* CE insert helpers */
-function insertCeHr(){
-  document.execCommand('insertHTML',false,'<hr>');
+function insertCeHr(style){
+  style=style||lastDividerStyle||'thin';
+  lastDividerStyle=style;
+  const colorAttr=lastDividerColor?` style="--rt-div-color:${esc(lastDividerColor)}"`:'';
+  document.execCommand('insertHTML',false,`<hr class="rt-div rt-div-${style}"${colorAttr}>`);
+  hideCtxMenu();
   saveCeIfActive();
+}
+function showCtxDividerPanel(){
+  const panel=document.getElementById('ctx-divider-panel');
+  if(panel) panel.style.display=panel.style.display==='none'?'block':'none';
+}
+function applyDividerColorFromInput(inp){
+  lastDividerColor=inp.value;
 }
 
 function saveCeIfActive(){
@@ -3118,7 +3202,7 @@ function renderCompByLevel(el, entries) {
 function compCatIconHtml(cat, sizeEm) {
   sizeEm = sizeEm || 1;
   if (cat && cat.iconImg) return `<img class="site-badge-img" src="${esc(cat.iconImg)}" alt="" style="width:${sizeEm}em;height:${sizeEm}em;object-fit:contain;vertical-align:-0.15em;">`;
-  return esc((cat && cat.icon) || '?');
+  return esc((cat && cat.icon) || '');
 }
 
 /* ---------- ENTRY HTML ---------- */
@@ -3539,7 +3623,7 @@ function renderNavMenu(){
   if(!links) return;
   const h=(location.hash||'').replace('#','');
   const activeSection=(h.match(/^src\/[^/]+\/([^/]+)/)||[])[1] || (h==='classes'?'classes':null);
-  let html = `<div class="nav-menu-item" onclick="closeNavMenu();location.hash=''">← Главная</div>`;
+  let html = `<div class="nav-menu-home-row"><button class="source-home-link nav-home-btn" onclick="closeNavMenu();location.hash=''">${ICO.home} Главная</button></div>`;
   if(currentSourceId){
     const s=sources.find(x=>x.id===currentSourceId);
     html += `<div class="nav-menu-sep"></div><div class="nav-menu-title">${esc(s?s.name:currentSourceId)}</div>`;
