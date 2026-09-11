@@ -14,6 +14,11 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-11 (21b) — УРОВНИ ОТКРЫТЫ ПО УМОЛЧАНИЮ + ПЛАВНАЯ АНИМАЦИЯ РАСКРЫТИЯ. Два коротких доп. запроса после доставки захода 21, плюс вопрос про удаление класса (ответ ниже, без изменений кода).
+  1) Adam: "пусть все записи в уровнях будут по умолчанию раскрыты" — раньше `abGroupOpen[key]` по умолчанию `undefined`→false (закрыто), теперь семантика инвертирована: `abGroupOpen[key]!==false` (открыто, если явно не закрыли). Затронуты `renderAbilities()` (isOpen), `toggleAbLevelGroup()` (теперь читает текущее состояние через ту же формулу перед инверсией) и `jumpToAbility()` (форс-открытие теперь проверяет `===false`, а не `!`). Существующие места, где код явно форсит `abGroupOpen[key]=true` (переключение подкласса, drag&drop в таблице, добавление умения через ПКМ) — не трогал, `true` валиден в обеих схемах. Побочный эффект: несколько старых QA-скриптов (`qa_fixes2.js`, `qa_abilities.js`, `qa_r19.js`, `qa_reflinks.js`) кликали по заголовку группы, чтобы её "раскрыть" для теста — теперь это лишний клик, закрывающий уже открытую группу (двойной тоггл); клики убраны/скрипты перестроены под новое поведение.
+  2) Adam: "скрытие раскрытие сделай плавным а не таким тогл то есть резким" — было `display:none↔block` (мгновенно, без транзишена — CSS не анимирует `display`). Заменено на CSS Grid-трюк: `.ab-level-body`/`.ability-body-wrap` теперь `display:grid;grid-template-rows:0fr`→(при `.open`)→`1fr`, с `transition:grid-template-rows`. КАПКАН (новый, см. память): у элемента-грид-айтема с `overflow:hidden;min-height:0` (без этого 0fr не схлопывается в 0px) НЕЛЬЗЯ одновременно держать padding — паддинг рендерится независимо от высоты трека, схлопнутое состояние тогда даёт не 0px, а высоту паддинга. Решение — третий уровень вложенности: средний div несёт только `overflow:hidden;min-height:0` (без отступов), самый внутренний — сам padding/flex-раскладку. Раскрытие/закрытие отдельного умения внутри уже открытой группы уровня анимируется независимо (своя пара `grid-template-rows`).
+  Вопрос Adam "если я удаляю класс он удаляется полностью?" — да: `deleteClass(id)` — `classes=classes.filter(c=>c.id!==id)`, класс и всё вложенное в него (умения, подклассы, sub-уровни, кастомные колонки таблицы, ссылки) удаляются целиком, т.к. хранятся внутри объекта класса, а не отдельными коллекциями. Общий компендиум (`COMP` — черты/приёмы/справочник) не трогается, это осознанно отдельная разделяемая библиотека.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright: новые `qa_defaultopen.js`/`qa_animate.js`/`qa_animate2.js` + полный регресс qa_r19/qa_fixes2/qa_abilities/qa_backbtn/qa_sections/qa_mobgap/qa_libdel/qa_reflinks.js, скриншот `21-5-animated-open.png`) — открытое состояние даёт реальную пиксельную высоту трека, закрытое — 0px (± незначащая суб-пиксельная погрешность на `.ability-body-wrap`), тоггл работает в обе стороны, 0 ошибок в консоли (кроме ожидаемого сетевого `ERR_TUNNEL_CONNECTION_FAILED`).
 2026-09-11 (21) — ССЫЛКИ НА ЗАПИСИ КОМПЕНДИУМА В ТЕКСТЕ + ПОЛНЫЙ ОТКАЗ ОТ "ПЛАШЕК" У УМЕНИЙ + ФУТЕР/ТАБЛИЦА ПО СКРИНШОТАМ. Заход открывал перевод классов, но Adam сначала попросил доделать фичу ссылок ("Сначала фича, потом перевод"), затем прислал скриншоты с ещё 5 отдельными правками.
   1) НОВОЕ: инлайн-ссылки на записи компендиума прямо в тексте `.ab-body-ce` (умения) — Adam запросил ДВА типа сразу, выбор по месту: (а) "переход" — открывает саму запись компендиума с кнопкой возврата туда, откуда пришли; (б) "попап" — всплывающая панель поверх страницы, закрывается крестиком/повторным кликом по ссылке/кликом вне окна. Вставка — новый пункт "Ссылка на запись ▸" в контекстном меню редактора (`showCtxMenu`→`showCtxRefPanel()`), с полем поиска по всем `COMP.entries` (`ctxRefSearch`, топ-8 по подстроке в name/nameEn), вставляет `<a class="ref-link" data-ref-id data-ref-mode>` (`insertRefLink`). Клик по ссылке ВНУТРИ активно редактируемого текста требует Ctrl/Cmd (иначе — просто ставит курсор, как в Notion/Google Docs, чтобы не мешать редактированию); в режиме чтения (гость, либо `.comp-view-body`) — срабатывает по обычному клику. Переход (`openRefLinkNav`) кладёт текущее место (режим/источник/библиотеку/открытую запись) в стек `refLinkStack`, кнопка "Назад" (`refBackBtnHtml`) при наличии стека восстанавливает его В ТОЧНОСТИ через `closeRefLinkReturn()` вместо обычного "Назад к списку". Попап (`openRefPopup`/`closeRefPopup`) — позиционируется от ссылки, клампится по вьюпорту. Проверено Playwright (`qa_reflinks.js`, 5 сценариев): вставка обеих ссылок, клик внутри CE не переходит, Ctrl+клик переходит и корректно возвращается (включая сохранение состояния развёрнутого спойлера уровня — `abGroupOpen` переживает переход туда-обратно, это ОЖИДАЕМО: состояние спойлеров сознательно живёт в памяти сессии, не сбрасывается навигацией), попап открывается/закрывается тремя способами, гостевой обычный клик (без Ctrl) переходит, т.к. `contenteditable` заблокирован — 0 ошибок в консоли.
   2) ФУТЕР ГЛАВНОЙ "ПЛЫВЁТ" — Adam заметил, что `© Master Oogway` сдвигается при разворачивании карточки источника, спросил не стоит ли зафиксировать его снизу, но так, чтобы будущие источники его не перекрыли. Ответ: классический паттерн "прижатый футер" (sticky footer) — `#home-view`/`#source-view`/`#classes-gallery-view` теперь `display:flex;flex-direction:column`, средний блок (`.home-body`/`.source-sections-grid`/`.classes-gallery-grid`) — `flex:1`. Футер всегда ровно у нижнего края экрана, ЕСЛИ контента меньше высоты вьюпорта; как только контента становится больше — просто сдвигается вниз естественным потоком, никогда не перекрывая контент (в отличие от `position:fixed`, который бы и перекрыл). Проверено Playwright: короткий контент — футер ровно на границе вьюпорта; после разворачивания карточки — футер строго ниже сетки источников, наложения нет.
@@ -365,8 +370,10 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-level-count{font-size:0.75em;color:var(--muted);background:transparent;border:none;padding:0;flex-shrink:0;}
 .ab-level-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;}
 .ab-level-group.open .ab-level-toggle{transform:rotate(90deg);}
-.ab-level-body{display:none;flex-direction:column;border-top:none;padding:10px 0 0 6px;gap:12px;}
-.ab-level-group.open .ab-level-body{display:flex;}
+.ab-level-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease;border-top:none;}
+.ab-level-group.open .ab-level-body{grid-template-rows:1fr;}
+.ab-level-body-inner{overflow:hidden;min-height:0;}
+.ab-level-body-pad{display:flex;flex-direction:column;padding:10px 0 0 6px;gap:12px;}
 .ability-card:not(:first-child){border-top:none;}
 .ability-header{display:flex;align-items:center;gap:8px;padding:0;cursor:pointer;user-select:none;background:transparent;}
 .ability-header:hover .ab-name-disp{color:var(--gold);}
@@ -384,8 +391,10 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-btn{font-size:0.77em;padding:3px 6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .ab-btn:hover{border-color:var(--gold);color:var(--gold);}
 .ab-btn.del:hover{border-color:#c06060;color:#c06060;}
-.ability-body-wrap{display:none;padding:6px 0 4px 0;}
-.ability-card.open .ability-body-wrap{display:block;}
+.ability-body-wrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows .2s ease;}
+.ability-card.open .ability-body-wrap{grid-template-rows:1fr;}
+.ability-body-wrap-inner{overflow:hidden;min-height:0;}
+.ability-body-wrap-pad{padding:6px 0 4px 0;}
 
 /* Rich text editor */
 .ab-body-ce{width:100%;background:transparent;border:1px solid transparent;outline:none;font-size:1.08em;color:#c8c0a8;line-height:1.7;padding:2px 0;min-height:44px;font-family:var(--font);word-wrap:break-word;overflow-wrap:break-word;border-radius:var(--radius-sm);}
@@ -585,7 +594,7 @@ body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
   .ltable-wrap{-webkit-overflow-scrolling:touch;overflow-x:auto;max-width:100%;}
   table.ltable{table-layout:auto;width:max-content;min-width:100%;}
   /* Редактор умений */
-  .ability-body-wrap{padding-left:10px;}
+  .ability-body-wrap-pad{padding-left:10px;}
   .sub-editor-top{flex-wrap:wrap;gap:6px;}
   /* Сетка слотов */
   .add-col-section,.tpl-section{flex-wrap:wrap;}
@@ -2008,7 +2017,8 @@ function autoHAll(){ document.querySelectorAll('.attr-val').forEach(autoH); }
 
 /* ABILITIES */
 /* Открытые/закрытые спойлеры уровней — в памяти сессии, не сохраняется в Firestore (заход 19).
-   Ключ "clsId:lv", по умолчанию все уровни свёрнуты. */
+   Ключ "clsId:lv". Заход 21: Adam попросил все уровни раскрытыми по умолчанию (было — все свёрнуты) —
+   default теперь ОТКРЫТО, значение false явно means "пользователь свернул в этой сессии". */
 let abGroupOpen={};
 function renderAbilities(cls){
   const subs=cls.subclasses||[];
@@ -2025,7 +2035,7 @@ function renderAbilities(cls){
   });
   return groups.map(g=>{
     const key=cls.id+':'+g.lv;
-    const isOpen=!!abGroupOpen[key];
+    const isOpen=abGroupOpen[key]!==false;
     const itemsHtml=g.items.map(a=>{
       const isSubLvAb=a.slvId!=null;
       const bodyHtml=a.body||'';
@@ -2043,7 +2053,7 @@ function renderAbilities(cls){
           <button class="ab-btn del" onclick="event.stopPropagation();delAb(${a.id})">✕</button>
           <span class="ab-toggle">▸</span>
         </div>
-        <div class="ability-body-wrap">
+        <div class="ability-body-wrap"><div class="ability-body-wrap-inner"><div class="ability-body-wrap-pad">
           <div class="ab-body-ce" contenteditable="true" data-id="${a.id}"
             onfocus="activeCeEl=this"
             onblur="saveCeBody(this,${a.id})"
@@ -2051,7 +2061,7 @@ function renderAbilities(cls){
             oncontextmenu="showCtxMenu(event,this);event.preventDefault()"
             onkeydown="ceKeydown(event)"
           >${bodyHtml}</div>
-        </div>
+        </div></div></div>
       </div>`;
     }).join('');
     return `<div class="ab-level-group${isOpen?' open':''}" data-lv-key="${key}">
@@ -2060,13 +2070,14 @@ function renderAbilities(cls){
         <span class="ab-level-count">(${g.items.length})</span>
         <span class="ab-level-toggle">▸</span>
       </div>
-      <div class="ab-level-body">${itemsHtml}</div>
+      <div class="ab-level-body"><div class="ab-level-body-inner"><div class="ab-level-body-pad">${itemsHtml}</div></div></div>
     </div>`;
   }).join('');
 }
 function toggleAbLevelGroup(clsId,lv){
   const key=clsId+':'+lv;
-  abGroupOpen[key]=!abGroupOpen[key];
+  const wasOpen=abGroupOpen[key]!==false;
+  abGroupOpen[key]=!wasOpen;
   document.querySelector(`.ab-level-group[data-lv-key="${key}"]`)?.classList.toggle('open');
 }
 
@@ -2448,7 +2459,7 @@ function jumpToAbility(abId){
   const key=cls.id+':'+(ab.lv||0);
   let needsRerender=false;
   if(!ab.open){ ab.open=true; save(); needsRerender=true; }
-  if(!abGroupOpen[key]){ abGroupOpen[key]=true; needsRerender=true; }
+  if(abGroupOpen[key]===false){ abGroupOpen[key]=true; needsRerender=true; }
   if(needsRerender){ const list=document.getElementById('abilities-list'); if(list)list.innerHTML=renderAbilities(cls); }
   // Скролл + подсветка
   setTimeout(()=>{
