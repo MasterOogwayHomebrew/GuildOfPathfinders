@@ -2015,7 +2015,7 @@ function renderLvRow(cls,lv,normalCols,casterCols){
       const sl=(cls.subLevels||[]).find(x=>x.id===-abId);
       const sub=sl?(cls.subclasses||[]).find(s=>s.id===sl.subId):null;
       const sc=sub?.color||null;
-      const s=sc?`background:${sc}1a;border-color:${sc}44;color:${sc};`:'';
+      const s=sc?`background:${mutedSubColor(sc)};border-color:${sc};color:var(--text);text-shadow:0 -1px 0 rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08);`:'';
       const linkedAb=sl?(cls.abilities||[]).find(a=>a.slvId===sl.id):null;
       const subDat=linkedAb?` data-ab-id="${linkedAb.id}"`:''
       const subCtx=linkedAb?` oncontextmenu="showTagCtxMenu(event,${linkedAb.id})"`:'';
@@ -2304,7 +2304,7 @@ function renderMain(){
     <div class="section">
       <div class="section-title">Подклассы</div>
       <div class="sub-bar">
-        <div class="sub-tab${activeSubId===null?' active':''}" onclick="selectSub(null)" style="${activeSubId===null?'border-color:var(--border);color:var(--muted);background:rgba(255,255,255,0.04);':''}">Без подкласса</div>
+        <div class="sub-tab${activeSubId===null?' active':''}" onclick="selectSub(null)">Без подкласса</div>
         ${subs.map(s=>{
           const sc=s.color||null;
           const styl=sc?`background:${mutedSubColor(sc)};border-color:${sc};`:'';
