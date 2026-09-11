@@ -14,6 +14,7 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-11 (21f) — УБРАНО ПОДЧЁРКИВАНИЕ У ИМЕНИ УМЕНИЯ. Adam: "эту желтый разделитель можно впринципе убрать раз у нас есть зеленый который раскрывается" — `.ab-name-disp` border-bottom (rgba(196,152,72,...), введён в заходе 21d) убран вместе с hover-веткой в `.ability-header:hover .ab-name-disp` и `padding-bottom`/своим `border-color` transition — раз зелёная граница между карточками умений (`.ability-card:not(:first-child)` border-top, заход 21d) уже даёт достаточное разделение, жёлтое подчёркивание под именем избыточно. Имя умения теперь просто цветной текст без подчёркивания.
 2026-09-11 (21e) — ЦВЕТА "УРОВЕНЬ"/ИМЯ УМЕНИЯ УПРОЩЕНЫ + РИМСКИЕ ЦИФРЫ В НАЗВАНИЯХ. Adam: "придумал надпись уровень сделаем светло зеленой а надпись умения желтой и все не паримся" — вместо тонкой настройки border/подчёркиваний (заход 21d) просто развёл два текста цветом:
   1) `.ab-level-title` ("Уровень N") — было `var(--gold2)`, стало приглушённый зелёный `#7fa88c` (hover `#93bfa1`).
   2) `.ab-name-disp` (название умения) — было `var(--text)`, стало приглушённый жёлто-золотой `#cdb35e` (hover `#ddc576`, border-bottom тоже чуть ярче). Правка в 2 местах: сам CSS-класс + инлайн `nameColor` fallback в `renderAbilities()` (у умений подкласса цвет всё ещё берётся из цвета подкласса `sc`, это не трогали).
@@ -394,12 +395,12 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-level-body-pad{display:flex;flex-direction:column;padding:10px 0 0 6px;gap:26px;}
 .ability-card:not(:first-child){border-top:1px solid var(--accent);padding-top:16px;}
 .ability-header{display:flex;align-items:center;gap:8px;padding:0;cursor:pointer;user-select:none;background:transparent;}
-.ability-header:hover .ab-name-disp{color:#ddc576;border-bottom-color:rgba(196,152,72,0.6);}
+.ability-header:hover .ab-name-disp{color:#ddc576;}
 .drag-handle{display:none;}
 .ab-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;margin-left:auto;}
 .ability-card.open .ab-toggle{transform:rotate(90deg);}
 .ab-name-wrap{flex:1;min-width:60px;display:flex;flex-direction:column;gap:1px;overflow:hidden;}
-.ab-name-disp{font-family:var(--font-head);font-size:1.05em;font-weight:600;letter-spacing:0.5px;color:#cdb35e;overflow:visible;text-overflow:clip;white-space:normal;transition:color .15s,border-color .15s;border-bottom:1px solid rgba(196,152,72,0.35);padding-bottom:4px;display:block;}
+.ab-name-disp{font-family:var(--font-head);font-size:1.05em;font-weight:600;letter-spacing:0.5px;color:#cdb35e;overflow:visible;text-overflow:clip;white-space:normal;transition:color .15s;display:block;}
 .ab-name-edit{width:100%;background:transparent;border:none;border-bottom:1px solid var(--gold);outline:none;font-size:1em;font-weight:700;color:var(--gold2);font-family:var(--font);}
 .ab-sl-hint-line{font-size:0.69em;color:var(--muted);font-style:italic;line-height:1.2;}
 .ab-type-in{background:transparent;border:none;outline:none;font-size:0.85em;font-style:italic;color:var(--muted);width:150px;font-family:var(--font);cursor:text;}
