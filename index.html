@@ -14,6 +14,14 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-11 (21) — ССЫЛКИ НА ЗАПИСИ КОМПЕНДИУМА В ТЕКСТЕ + ПОЛНЫЙ ОТКАЗ ОТ "ПЛАШЕК" У УМЕНИЙ + ФУТЕР/ТАБЛИЦА ПО СКРИНШОТАМ. Заход открывал перевод классов, но Adam сначала попросил доделать фичу ссылок ("Сначала фича, потом перевод"), затем прислал скриншоты с ещё 5 отдельными правками.
+  1) НОВОЕ: инлайн-ссылки на записи компендиума прямо в тексте `.ab-body-ce` (умения) — Adam запросил ДВА типа сразу, выбор по месту: (а) "переход" — открывает саму запись компендиума с кнопкой возврата туда, откуда пришли; (б) "попап" — всплывающая панель поверх страницы, закрывается крестиком/повторным кликом по ссылке/кликом вне окна. Вставка — новый пункт "Ссылка на запись ▸" в контекстном меню редактора (`showCtxMenu`→`showCtxRefPanel()`), с полем поиска по всем `COMP.entries` (`ctxRefSearch`, топ-8 по подстроке в name/nameEn), вставляет `<a class="ref-link" data-ref-id data-ref-mode>` (`insertRefLink`). Клик по ссылке ВНУТРИ активно редактируемого текста требует Ctrl/Cmd (иначе — просто ставит курсор, как в Notion/Google Docs, чтобы не мешать редактированию); в режиме чтения (гость, либо `.comp-view-body`) — срабатывает по обычному клику. Переход (`openRefLinkNav`) кладёт текущее место (режим/источник/библиотеку/открытую запись) в стек `refLinkStack`, кнопка "Назад" (`refBackBtnHtml`) при наличии стека восстанавливает его В ТОЧНОСТИ через `closeRefLinkReturn()` вместо обычного "Назад к списку". Попап (`openRefPopup`/`closeRefPopup`) — позиционируется от ссылки, клампится по вьюпорту. Проверено Playwright (`qa_reflinks.js`, 5 сценариев): вставка обеих ссылок, клик внутри CE не переходит, Ctrl+клик переходит и корректно возвращается (включая сохранение состояния развёрнутого спойлера уровня — `abGroupOpen` переживает переход туда-обратно, это ОЖИДАЕМО: состояние спойлеров сознательно живёт в памяти сессии, не сбрасывается навигацией), попап открывается/закрывается тремя способами, гостевой обычный клик (без Ctrl) переходит, т.к. `contenteditable` заблокирован — 0 ошибок в консоли.
+  2) ФУТЕР ГЛАВНОЙ "ПЛЫВЁТ" — Adam заметил, что `© Master Oogway` сдвигается при разворачивании карточки источника, спросил не стоит ли зафиксировать его снизу, но так, чтобы будущие источники его не перекрыли. Ответ: классический паттерн "прижатый футер" (sticky footer) — `#home-view`/`#source-view`/`#classes-gallery-view` теперь `display:flex;flex-direction:column`, средний блок (`.home-body`/`.source-sections-grid`/`.classes-gallery-grid`) — `flex:1`. Футер всегда ровно у нижнего края экрана, ЕСЛИ контента меньше высоты вьюпорта; как только контента становится больше — просто сдвигается вниз естественным потоком, никогда не перекрывая контент (в отличие от `position:fixed`, который бы и перекрыл). Проверено Playwright: короткий контент — футер ровно на границе вьюпорта; после разворачивания карточки — футер строго ниже сетки источников, наложения нет.
+  3) ШАПКА ТАБЛИЦЫ КЛАССА "УР"/"БВ" ПЕРЕНОСИЛАСЬ ПО БУКВАМ — из-за общего `word-break:break-word` на `th` и слишком узкой дефолтной ширины (30/36px) двухбуквенные аббревиатуры переносились по одной букве на строку ("вертикальный" вид). Добавлено `white-space:nowrap` для `th[data-col="lv"]`/`th[data-col="prof"]` (по аналогии с уже существующим правилом для слотовых колонок кастера `th[data-slot]`), дефолтная ширина увеличена до 40/46px — теперь всегда в одну строку, освобождая место под цифры.
+  4) КАСТ-ТАБЛИЦЫ (`applySlotTemplate`) — ПРОВЕРЕНО: названия колонок и сами ячейки УЖЕ были редактируемы как обычные колонки (`ondblclick="renameCol"` на заголовке, `<input oninput="updLvCustom">` в ячейках) — отдельно чинить было нечего, подтверждено Playwright. Колонка "ПЗ" (подготовленные заклинания) — есть у шаблонов `full`/`half` (это RAW-корректно: Жрец/Друид/Паладин и т.п. — подготавливающие касты). У `third` (треть-кастер — Мистический рыцарь/Мистический трюкач) её НЕТ осознанно: в 5e эти архетипы знают фиксированный список заклинаний ("известные"), а не подготавливают — так что это не баг, а RAW. Если для этой самодельной системы нужно трактовать иначе — надо отдельно сказать, добавлю.
+  5) ПОПУТНО НАЙДЕН И ПОЧИНЕН мелкий баг консоли: инлайн-переименование колонки/группы колонок/умения (`renameCol`/`renameColGroup`/`editAbName`) — `commit()` мог вызваться дважды (Enter → keydown-хендлер, затем сразу следующий blur от потери фокуса) → вторая попытка `inp.replaceWith(span)` падала с "node is no longer a child of this node" в консоли. Добавлен флаг `committed` — `commit()` теперь срабатывает не более одного раза за сессию редактирования поля.
+  6) ПОЛНЫЙ ОТКАЗ ОТ "ПЛАШЕК" У УМЕНИЙ — Adam прислал скриншоты dnd.su: "самих плашек вообще не было... кликабельный заголовок просто на чистом фоне сайта... раскрыв раскрывает все умения тоже заголовками". У `.ab-level-group` убраны фон/рамка/border-radius/тень (был явно оставлен "как есть" в заходе 19, теперь Adam решил иначе) — остался только тонкий `border-bottom` между уровнями вместо полноценного бокса. У `.ability-header`/`.ability-card` — тоже убран hover-фон, `.ab-name-disp` теперь полноценный заголовок (без `white-space:nowrap`+`ellipsis`, раньше обрезался как в пилюле). Счётчик умений в заголовке уровня — был отдельной "пилюлей" с рамкой, стал простым текстом в скобках `(N)`. Кликабельность/раскрытие — не тронуты, только визуал.
+  ПРОВЕРЕНО ЛОКАЛЬНО (Playwright: qa_reflinks.js + regression qa_r19/qa_fixes2/qa_abilities/qa_backbtn/qa_sections/qa_mobgap/qa_libdel.js, скриншоты) — везде 0 ошибок в консоли (кроме ожидаемых сетевых `ERR_TUNNEL_CONNECTION_FAILED` в изолированной среде без доступа к Google Fonts).
 2026-09-08 (20c) — КАСКАДНОЕ УДАЛЕНИЕ БИБЛИОТЕКИ. Adam спросил, удаляются ли записи при удалении библиотеки из меню источника — раньше НЕТ (`deleteSourceLibrary()` трогала только `src.libraries[]`, категории/записи оставались осиротевшими мёртвым грузом в Firestore навсегда). Adam явно попросил каскадное удаление ("мёртвый груз нам не к чему"): `deleteSourceLibrary(srcId,libId)` теперь дополнительно находит все `COMP.categories` с этим `libId`, удаляет их и все `COMP.entries` с `catId` из этого набора, вызывает `saveComp()` (раньше не вызывался вообще). Текст `confirm()` показывает точное число категорий/записей на удаление и явно предупреждает "БЕЗВОЗВРАТНО" — раньше формулировка наоборот успокаивала ("НЕ удаляются"), теперь ровно наоборот, это осознанная деструктивная операция. Проверено Playwright (`qa_libdel.js`): удаление библиотеки с 2 категориями/3 записями чисто стирает их из `COMP`, соседняя библиотека и её записи не затронуты, confirm-текст показывает верные числа.
 2026-09-08 (20b) — ПОСТ-РЕЛИЗНЫЕ ПРАВКИ ПО ФИДБЕКУ НА ЗАХОД 20 (4 отдельных уточнения после доставки).
   1) `.ab-body-ce` (текст описания умения, РАЗВЁРНУТОЕ состояние) — Adam скриншотом с красными стрелками уточнил, что в заходе 20 п.1 я убрал рамку только у `.ability-card`, но сама плашка ТЕКСТА при разворачивании умения (`.ab-body-ce`) всё ещё имела свой `background:rgba(0,0,0,0.18)`+`border:1px solid var(--border)` — именно её Adam имел в виду ("не разделительную рамку между умениями... чтобы текст как будто выползал из под плашки на страницу не имея окна"). Убраны фон и рамка полностью (`background:transparent;border:1px solid transparent`), паддинг уменьшен (`7px 10px`→`2px 0`, рамка больше не нужна как визуальный контейнер). Добавлен лёгкий hint при фокусе (`:focus{border-bottom-color:rgba(158,124,50,0.35)}`) — по аналогии с уже существующим паттерном инлайн-редактирования (`.ab-name-edit`), чтобы область редактирования была угадываема при клике, но не выглядела окном в состоянии просмотра.
@@ -208,6 +216,10 @@ CHANGELOG (новое сверху):
 - Редизайн карточек умений (.ability-card) — группировка по уровню в разворачивающиеся спойлеры — СДЕЛАНО 2026-09-08(19): новая обёртка .ab-level-group (свёрнута по умолчанию) с заголовком-уровнем, .ability-card внутри — лёгкая вложенная строка, data-id/toggleAb/jumpToAbility и т.д. не тронуты. Подробности — в CHANGELOG заход 19.
 - Архитектура источников: у нового источника был фиксированный шаблон разделов (Классы/Приёмы/Черты/Справочник) — СДЕЛАНО 2026-09-08(19): source.classesOn/.referenceOn (тумблеры) + source.libraries[] (свободные именованные библиотеки, добавление/удаление). Новый источник стартует пустым. Миграция сохранила старые hash-ссылки (/styles, /maneuvers).
 - Перевод предметов (next.dnd.su/equipment) как эталон для будущих переводов — Adam явно попросил (заход 19): НЕ на сайт, только в персистентную память Claude. НЕ СДЕЛАНО.
+- Ссылки на записи компендиума прямо в тексте умений (переход+попап) — СДЕЛАНО 2026-09-11(21): ref-link, подробности в CHANGELOG заход 21. Блокировало старт перевода классов — теперь разблокировано.
+- Футер главной "плыл" при разворачивании карточки источника — СДЕЛАНО 2026-09-11(21): sticky-footer через flex (display:flex;flex-direction:column + flex:1 на среднем блоке) у #home-view/#source-view/#classes-gallery-view.
+- Заголовки "УР"/"БВ" в таблице класса переносились по буквам (слишком узкие колонки) — СДЕЛАНО 2026-09-11(21): white-space:nowrap + ширина 40/46px.
+- Редизайн плашек умений (.ability-card) — ОКОНЧАТЕЛЬНО СДЕЛАНО 2026-09-11(21): Adam решил убрать вообще все боксы/фоны/рамки, включая .ab-level-group (в заходе 19 просил оставить как есть — передумал по скриншотам dnd.su), теперь чистые текстовые заголовки на фоне страницы. .feature-tag (плашки в самой таблице) не трогали — другой элемент, отдельный вопрос если понадобится.
 ═══════════════════════════════════════════════════════════════════════════════ -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -278,6 +290,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 table.ltable{border-collapse:collapse;border:1px solid var(--border);font-size:var(--table-fs);table-layout:fixed;width:100%;}
 table.ltable th{font-size:0.65em;letter-spacing:1px;color:var(--muted);text-transform:uppercase;padding:5px 14px 5px 4px;background:var(--panel2);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:normal;word-break:break-word;overflow-wrap:break-word;text-align:center;position:relative;user-select:none;overflow:visible;font-family:var(--font);font-weight:700;}
 table.ltable th[data-slot]{white-space:nowrap;word-break:normal;overflow-wrap:normal;}
+table.ltable th[data-col="lv"],table.ltable th[data-col="prof"]{white-space:nowrap;word-break:normal;overflow-wrap:normal;}
 table.ltable th:last-child{border-right:none;}
 table.ltable th.grp-hdr{background:rgba(78,122,92,0.08);color:var(--accent);font-size:0.65em;border-bottom:1px solid rgba(78,122,92,0.2);}
 table.ltable th.col-drag-over{background:rgba(158,124,50,0.15)!important;outline:2px solid var(--gold);}
@@ -338,25 +351,30 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .tiny-btn:hover{border-color:var(--gold);color:var(--gold);}
 .tiny-btn.del:hover{border-color:#c06060;color:#c06060;}
 
-/* ABILITIES — сгруппированы по уровню в разворачивающиеся спойлеры (заход 19) */
-.abilities-list{display:flex;flex-direction:column;gap:6px;}
-.ab-level-group{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.2);}
-.ab-level-header{display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;user-select:none;}
-.ab-level-header:hover{background:rgba(255,255,255,0.03);}
-.ab-level-title{font-family:var(--font-head);font-size:1.02em;font-weight:700;letter-spacing:0.6px;color:var(--gold2);flex:1;}
-.ab-level-count{font-size:0.75em;color:var(--muted);background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:var(--radius-pill);padding:1px 8px;flex-shrink:0;}
+/* ABILITIES — заход 21: убраны все "плашки"/боксы (и у группы уровня, и у карточки умения) —
+   Adam по скриншотам dnd.su: "кликабельный заголовок просто на чистом фоне самого сайта который
+   называется своим уровнем, и раскрыв у нас раскрывает все те умения которые там есть тоже загаловками".
+   .ab-level-group/.ability-header больше НЕ имеют фона/рамки/тени — только текст-заголовок на фоне
+   страницы, разделители между уровнями — тонкая нижняя линия вместо бокса. */
+.abilities-list{display:flex;flex-direction:column;gap:0;}
+.ab-level-group{background:transparent;border:none;border-bottom:1px solid var(--border);border-radius:0;overflow:visible;box-shadow:none;padding:12px 0;}
+.ab-level-group:last-child{border-bottom:none;}
+.ab-level-header{display:flex;align-items:center;gap:10px;padding:0;cursor:pointer;user-select:none;background:transparent;}
+.ab-level-header:hover .ab-level-title{color:var(--gold);}
+.ab-level-title{font-family:var(--font-head);font-size:1.2em;font-weight:700;letter-spacing:0.6px;color:var(--gold2);flex:1;transition:color .15s;}
+.ab-level-count{font-size:0.75em;color:var(--muted);background:transparent;border:none;padding:0;flex-shrink:0;}
 .ab-level-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;}
 .ab-level-group.open .ab-level-toggle{transform:rotate(90deg);}
-.ab-level-body{display:none;flex-direction:column;border-top:1px solid var(--border);padding:2px 0;}
+.ab-level-body{display:none;flex-direction:column;border-top:none;padding:10px 0 0 6px;gap:12px;}
 .ab-level-group.open .ab-level-body{display:flex;}
-.ability-card:not(:first-child){border-top:1px solid rgba(255,255,255,0.07);}
-.ability-header{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;user-select:none;}
-.ability-header:hover{background:rgba(255,255,255,0.02);}
+.ability-card:not(:first-child){border-top:none;}
+.ability-header{display:flex;align-items:center;gap:8px;padding:0;cursor:pointer;user-select:none;background:transparent;}
+.ability-header:hover .ab-name-disp{color:var(--gold);}
 .drag-handle{display:none;}
 .ab-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;margin-left:auto;}
 .ability-card.open .ab-toggle{transform:rotate(90deg);}
 .ab-name-wrap{flex:1;min-width:60px;display:flex;flex-direction:column;gap:1px;overflow:hidden;}
-.ab-name-disp{font-family:var(--font-head);font-size:1.08em;font-weight:600;letter-spacing:0.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ab-name-disp{font-family:var(--font-head);font-size:1.05em;font-weight:600;letter-spacing:0.5px;color:var(--text);overflow:visible;text-overflow:clip;white-space:normal;transition:color .15s;}
 .ab-name-edit{width:100%;background:transparent;border:none;border-bottom:1px solid var(--gold);outline:none;font-size:1em;font-weight:700;color:var(--gold2);font-family:var(--font);}
 .ab-sl-hint-line{font-size:0.69em;color:var(--muted);font-style:italic;line-height:1.2;}
 .ab-type-in{background:transparent;border:none;outline:none;font-size:0.85em;font-style:italic;color:var(--muted);width:150px;font-family:var(--font);cursor:text;}
@@ -366,7 +384,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-btn{font-size:0.77em;padding:3px 6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-sm);}
 .ab-btn:hover{border-color:var(--gold);color:var(--gold);}
 .ab-btn.del:hover{border-color:#c06060;color:#c06060;}
-.ability-body-wrap{display:none;padding:0 14px 12px 14px;}
+.ability-body-wrap{display:none;padding:6px 0 4px 0;}
 .ability-card.open .ability-body-wrap{display:block;}
 
 /* Rich text editor */
@@ -405,6 +423,28 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 @keyframes diceHit{0%{background:rgba(158,124,50,0.5)}100%{background:rgba(158,124,50,0.22)}}
 .ab-body-ce table.dice-table .dice-row-hit td{animation:diceHit 0.35s ease-out forwards;}
 .dice-roll-wrap{display:inline-flex;align-items:center;gap:6px;}
+
+/* Заход 21: ссылки на записи компендиума внутри текста умения/записи — переход или попап */
+.ref-link{color:var(--gold2);text-decoration:underline;text-decoration-style:dotted;text-decoration-color:rgba(158,124,50,0.55);cursor:pointer;}
+.ref-link:hover{color:var(--gold);}
+.ref-popup{position:fixed;z-index:500;width:min(360px,90vw);background:var(--panel);border:1px solid var(--gold);border-radius:var(--radius-sm);box-shadow:0 10px 30px rgba(0,0,0,0.55);padding:14px 34px 14px 16px;display:none;}
+.ref-popup.vis{display:block;}
+.ref-popup-close{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--muted);font-size:1.1em;line-height:1;}
+.ref-popup-close:hover{color:var(--gold);}
+.ref-popup-title{font-family:var(--font-head);color:var(--gold2);font-weight:700;font-size:1.05em;}
+.ref-popup-nameen{font-size:0.8em;color:var(--muted);font-style:italic;margin-bottom:8px;}
+.ref-popup-body{font-size:0.92em;line-height:1.55;color:#c8c0a8;max-height:50vh;overflow-y:auto;}
+.ctx-ref-search{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:0.85em;padding:6px 8px;outline:none;border-radius:var(--radius-sm);font-family:var(--font);margin:2px 0 4px;}
+.ctx-ref-search:focus{border-color:var(--gold);}
+.ctx-ref-results{max-height:220px;overflow-y:auto;}
+.ctx-ref-result{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:var(--radius-sm);font-size:0.85em;}
+.ctx-ref-result:hover{background:rgba(158,124,50,0.1);}
+.ctx-ref-result-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+.ctx-ref-result-en{color:var(--muted);font-style:italic;font-size:0.9em;}
+.ctx-ref-result-actions{display:flex;gap:4px;flex-shrink:0;}
+.ctx-ref-act{cursor:pointer;padding:2px 5px;border-radius:var(--radius-sm);color:var(--muted);}
+.ctx-ref-act:hover{color:var(--gold);background:rgba(158,124,50,0.15);}
+.ctx-ref-empty{padding:6px;font-size:0.82em;color:var(--muted);font-style:italic;}
 .dice-roll-btn{display:inline-block;background:rgba(158,124,50,0.12);border:1px solid rgba(158,124,50,0.35);color:var(--gold);padding:1px 7px;cursor:pointer;font-size:0.8em;user-select:none;transition:all .15s;border-radius:var(--radius-sm);}
 .dice-roll-btn:hover{background:rgba(158,124,50,0.25);border-color:var(--gold);}
 .dice-result-disp{font-size:0.8em;color:var(--gold2);min-width:30px;}
@@ -716,7 +756,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 #app-view.r-hidden{display:none;}
 #home-view.r-hidden{display:none;}
 #classes-gallery-view.r-hidden{display:none;}
-#home-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
+#home-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);display:flex;flex-direction:column;}
 .home-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:64px 24px 44px;position:relative;overflow:hidden;}
 .home-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 0%,rgba(78,122,92,0.12),transparent 70%);pointer-events:none;}
 .home-emblem{width:64px;height:64px;opacity:0.9;margin-bottom:14px;}
@@ -736,7 +776,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-link-del:hover{color:#c06060;opacity:1;}
 .home-link-add-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:transparent;border:1px dashed var(--border);border-radius:var(--radius-pill);color:var(--muted);font-size:0.85em;cursor:pointer;font-family:var(--font);transition:all .15s;}
 .home-link-add-btn:hover{border-color:var(--gold);color:var(--gold);}
-.home-body{max-width:1500px;margin:0 auto;padding:0 28px 80px;}
+.home-body{max-width:1500px;margin:0 auto;padding:0 28px 80px;width:100%;flex:1;}
 .home-section-label{font-family:var(--font-head);font-size:0.72em;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:12px;margin-bottom:18px;}
 .home-section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(158,124,50,0.3),transparent);}
 .home-sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-items:start;}
@@ -791,17 +831,17 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-source-badge{width:40px;height:40px;object-fit:contain;border-radius:6px;margin-bottom:10px;display:block;}
 
 /* ═══ СТРАНИЦА ИСТОЧНИКА (Источник→Раздел) ═══ */
-#source-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
+#source-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);display:flex;flex-direction:column;}
 #source-view.r-hidden{display:none;}
-#classes-gallery-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);}
+#classes-gallery-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);display:flex;flex-direction:column;}
 .source-hero{max-width:900px;margin:0 auto;padding:50px 24px 10px;text-align:center;}
 .source-home-link{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:var(--font);font-size:0.95em;font-weight:600;cursor:pointer;margin-bottom:22px;padding:9px 18px;display:inline-flex;align-items:center;gap:8px;transition:all .15s;border-radius:var(--radius-sm);}
 .source-home-link:hover{border-color:var(--gold);color:var(--gold);}
 .source-title{font-family:var(--font-head);font-size:1.9em;font-weight:700;color:var(--gold2);letter-spacing:0.04em;margin-bottom:10px;}
 .source-desc{font-family:var(--font-body);color:var(--muted);font-size:1.08em;margin-bottom:8px;}
-.source-sections-grid{max-width:900px;margin:26px auto 0;padding:0 24px 60px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.source-sections-grid{max-width:900px;width:100%;margin:26px auto 0;padding:0 24px 60px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;align-content:start;flex:1;}
 .source-section-btn{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:22px 14px;text-align:center;cursor:pointer;font-family:var(--font-head);font-size:0.95em;letter-spacing:0.04em;color:var(--text);transition:all .15s;}
-.classes-gallery-grid{max-width:1500px;margin:10px auto 0;padding:0 24px 60px;}
+.classes-gallery-grid{max-width:1500px;width:100%;margin:10px auto 0;padding:0 24px 60px;flex:1;}
 .source-section-btn:hover{border-color:var(--gold);color:var(--gold2);background:var(--panel2);}
 .source-stub{max-width:600px;margin:20px auto 60px;text-align:center;color:var(--muted);font-family:var(--font);padding:0 24px;grid-column:1/-1;}
 
@@ -929,6 +969,7 @@ if (location.hash === '#classes' || /^#src\/[^/]+\/classes$/.test(location.hash)
 
 <!-- Context menu -->
 <div class="ab-ctx-menu" id="ctx-menu"></div>
+<div class="ref-popup" id="ref-popup"></div>
 
 
 <div class="modal-overlay" id="modal">
@@ -1824,7 +1865,9 @@ function renameCol(cid, span){
   const inp=document.createElement('input');
   inp.value=prev;
   inp.style.cssText='width:'+(Math.max(span.offsetWidth,60))+'px;background:var(--panel);border:1px solid var(--gold);color:var(--text);font-size:inherit;font-family:inherit;padding:0 3px;outline:none;min-width:40px;max-width:160px;';
+  let committed=false;
   const commit=()=>{
+    if(committed)return; committed=true;
     const v=inp.value.trim()||prev;
     col.name=v; save();
     span.textContent=v;
@@ -1843,7 +1886,9 @@ function renameColGroup(gid, span){
   const inp=document.createElement('input');
   inp.value=prev;
   inp.style.cssText='width:'+(Math.max(span.offsetWidth,60))+'px;background:var(--panel);border:1px solid var(--gold);color:var(--text);font-size:inherit;font-family:inherit;padding:0 3px;outline:none;min-width:40px;max-width:200px;text-align:center;';
+  let committed=false;
   const commit=()=>{
+    if(committed)return; committed=true;
     const v=inp.value.trim()||prev;
     grp.name=v; save();
     span.textContent=v;
@@ -1888,8 +1933,8 @@ function renderTable(cls){
       ).join('')}
     </tr>`:''}
     <tr>
-      <th data-col="lv" ${colW(cls,'lv',30)}>Ур${rh}</th>
-      <th data-col="prof" ${colW(cls,'prof',36)}>БВ${rh}</th>
+      <th data-col="lv" ${colW(cls,'lv',40)}>Ур${rh}</th>
+      <th data-col="prof" ${colW(cls,'prof',46)}>БВ${rh}</th>
       <th data-col="features" style="width:${cw['features']||180}px">Классовые умения${rh}</th>
       ${normalCols.map(c=>`<th data-col="${c.id}" ${colW(cls,c.id,70)} draggable="true" title="${esc(c.name)}"><div class="col-hdr-inner"><span class="col-drag-handle">⠿</span><span class="col-hdr-name" ondblclick="renameCol('${c.id}',this)">${esc(mobileAbbr(c.name))}</span><span class="del-col-btn" onclick="delCol('${c.id}')">✕</span></div>${rh}</th>`).join('')}
       ${casterCols.map(c=>`<th data-col="${c.id}" ${c.isSlot?'data-slot':''} ${colW(cls,c.id,c.isSlot?0:60)} title="${esc(c.name)}"><div class="col-hdr-inner"><span class="col-hdr-name" ondblclick="renameCol('${c.id}',this)">${esc(mobileAbbr(c.name))}</span></div>${rh}</th>`).join('')}
@@ -2012,7 +2057,7 @@ function renderAbilities(cls){
     return `<div class="ab-level-group${isOpen?' open':''}" data-lv-key="${key}">
       <div class="ab-level-header" onclick="toggleAbLevelGroup(${cls.id},${g.lv})" oncontextmenu="showLvCtxMenu(event,${g.lv})">
         <span class="ab-level-title">Уровень ${g.lv||'—'}</span>
-        <span class="ab-level-count">${g.items.length}</span>
+        <span class="ab-level-count">(${g.items.length})</span>
         <span class="ab-level-toggle">▸</span>
       </div>
       <div class="ab-level-body">${itemsHtml}</div>
@@ -2066,7 +2111,9 @@ function editAbName(el,id){
   const inp=document.createElement('input');
   inp.className='ab-name-edit'; inp.value=a.name;
   el.replaceWith(inp); inp.focus(); inp.select();
+  let committed=false;
   const commit=()=>{
+    if(committed)return; committed=true;
     const v=inp.value.trim()||a.name;
     a.name=v; save();
     const span=document.createElement('span');
@@ -2654,6 +2701,11 @@ function showCtxMenu(e,el){
   html+=`<div class="ctx-sep"></div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertTable()"><span class="ctx-icon">▦</span>Вставить таблицу</div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertDiceTable()"><span class="ctx-icon">🎲</span>Таблица бросков</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxRefPanel()"><span class="ctx-icon">🔗</span>Ссылка на запись ▸</div>`;
+  html+=`<div id="ctx-ref-panel" style="display:none">
+    <input type="text" class="ctx-ref-search" id="ctx-ref-search-inp" placeholder="Поиск записи..." oninput="ctxRefSearch(this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+    <div class="ctx-ref-results" id="ctx-ref-results"></div>
+  </div>`;
   if(insideTable){
     html+=`<div class="ctx-sep"></div>`;
     html+=`<div class="ctx-item" onmousedown="event.preventDefault();ceTableAddRow(event)"><span class="ctx-icon">+</span>Добавить строку</div>`;
@@ -2704,6 +2756,123 @@ function showCtxDividerPanel(){
 function applyDividerColorFromInput(inp){
   lastDividerColor=inp.value;
 }
+
+/* Заход 21: ссылки на записи компендиума внутри текста умения/записи (переход или попап) */
+function showCtxRefPanel(){
+  const panel=document.getElementById('ctx-ref-panel');
+  if(!panel) return;
+  const opening = panel.style.display==='none';
+  panel.style.display = opening?'block':'none';
+  if(opening){
+    document.getElementById('ctx-ref-results').innerHTML='';
+    const inp=document.getElementById('ctx-ref-search-inp');
+    if(inp){ inp.value=''; setTimeout(()=>inp.focus(),0); }
+  }
+}
+function ctxRefSearch(q){
+  const results=document.getElementById('ctx-ref-results');
+  if(!results) return;
+  q=(q||'').trim().toLowerCase();
+  if(q.length<2){ results.innerHTML=''; return; }
+  const matches=COMP.entries.filter(e=>(e.name||'').toLowerCase().includes(q)||(e.nameEn||'').toLowerCase().includes(q)).slice(0,8);
+  results.innerHTML = matches.length ? matches.map(e=>{
+    const cat=compGetCat(e.catId);
+    return `<div class="ctx-ref-result" style="color:${cat.color||'inherit'}">
+      <span class="ctx-ref-result-name">${esc(e.name||'—')}${e.nameEn?` <span class="ctx-ref-result-en">[${esc(e.nameEn)}]</span>`:''}</span>
+      <span class="ctx-ref-result-actions">
+        <span class="ctx-ref-act" title="Вставить как переход к записи" onmousedown="event.preventDefault();insertRefLink(${e.id},'nav')">↗</span>
+        <span class="ctx-ref-act" title="Вставить как всплывающую подсказку" onmousedown="event.preventDefault();insertRefLink(${e.id},'popup')">💬</span>
+      </span>
+    </div>`;
+  }).join('') : `<div class="ctx-ref-empty">Ничего не найдено</div>`;
+}
+function insertRefLink(entryId, mode){
+  if(!ctxCeEl) return;
+  const e=COMP.entries.find(x=>x.id===entryId); if(!e) return;
+  ctxCeEl.focus();
+  if(savedForeRange){ const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(savedForeRange); }
+  const sel=window.getSelection();
+  const hasSelection = sel && sel.rangeCount && !sel.getRangeAt(0).collapsed;
+  const label = hasSelection ? sel.toString() : (e.name||'Запись');
+  document.execCommand('insertHTML', false, `<a class="ref-link" data-ref-id="${entryId}" data-ref-mode="${mode}">${esc(label)}</a>`);
+  hideCtxMenu();
+  saveCeIfActive();
+}
+
+/* Открытие ссылки на запись: переход (с возвратом туда, откуда пришли) или попап */
+let refLinkStack=[];
+function openRefLinkNav(entryId){
+  const e=COMP.entries.find(x=>x.id===entryId);
+  if(!e){ alert('Запись не найдена — возможно, была удалена.'); return; }
+  const cat=compGetCat(e.catId);
+  refLinkStack.push({ wasCompMode: document.body.classList.contains('comp-mode'), currentSourceId, openLibId, compOpenId, compDetailEdit });
+  currentSourceId = e.sourceId || currentSourceId;
+  openLibId = cat.libId || openLibId;
+  compDetailEdit = false;
+  if(!document.body.classList.contains('comp-mode')) openCompendium();
+  compOpenEntry(entryId);
+}
+function closeRefLinkReturn(){
+  const r=refLinkStack.pop();
+  if(!r){ compOpenId=null; compDetailEdit=false; renderCompBody(); return; }
+  currentSourceId=r.currentSourceId; openLibId=r.openLibId;
+  if(!r.wasCompMode){ closeCompendium(); return; }
+  compOpenId=r.compOpenId; compDetailEdit=r.compDetailEdit;
+  if(compOpenId!=null) renderCompDetail(compOpenId); else renderCompBody();
+}
+function refBackBtnHtml(){
+  return refLinkStack.length
+    ? `<button class="comp-detail-back" onclick="closeRefLinkReturn()">${ICO.back} Назад</button>`
+    : `<button class="comp-detail-back" onclick="compOpenId=null;compDetailEdit=false;renderCompBody()">${ICO.back} Назад к списку</button>`;
+}
+
+let refPopupLinkEl=null;
+function openRefPopup(entryId, linkEl){
+  const panel=document.getElementById('ref-popup');
+  if(!panel) return;
+  if(refPopupLinkEl===linkEl && panel.classList.contains('vis')){ closeRefPopup(); return; }
+  const e=COMP.entries.find(x=>x.id===entryId);
+  panel.innerHTML = e ? `<span class="ref-popup-close" onclick="closeRefPopup()">✕</span>
+    <div class="ref-popup-title">${esc(e.name||'—')}</div>
+    ${e.nameEn?`<div class="ref-popup-nameen">${esc(e.nameEn)}</div>`:''}
+    <div class="ref-popup-body">${e.body||'<span style="color:var(--muted);font-style:italic">Описание отсутствует</span>'}</div>`
+    : `<span class="ref-popup-close" onclick="closeRefPopup()">✕</span><div class="ref-popup-body" style="font-style:italic;color:var(--muted)">Запись не найдена — возможно, была удалена.</div>`;
+  refPopupLinkEl=linkEl;
+  panel.classList.add('vis');
+  panel.style.visibility='hidden'; panel.style.left='0'; panel.style.top='0';
+  const pw=panel.offsetWidth, ph=panel.offsetHeight;
+  panel.style.visibility='';
+  const r=linkEl.getBoundingClientRect();
+  let x=r.left, y=r.bottom+6;
+  if(x+pw>window.innerWidth-8) x=window.innerWidth-pw-8;
+  if(x<8) x=8;
+  if(y+ph>window.innerHeight-8) y=r.top-ph-6;
+  if(y<8) y=8;
+  panel.style.left=x+'px'; panel.style.top=y+'px';
+}
+function closeRefPopup(){
+  const panel=document.getElementById('ref-popup');
+  if(panel) panel.classList.remove('vis');
+  refPopupLinkEl=null;
+}
+document.addEventListener('click', function(e){
+  const link=e.target.closest('.ref-link');
+  const popup=document.getElementById('ref-popup');
+  if(link){
+    const editableAncestor=link.closest('[contenteditable="true"]');
+    if(editableAncestor && !(e.ctrlKey||e.metaKey)){
+      if(popup && popup.classList.contains('vis') && refPopupLinkEl!==link) closeRefPopup();
+      return; // обычный клик внутри активного редактора — просто ставим курсор, не переходим по ссылке
+    }
+    e.preventDefault(); e.stopPropagation();
+    const id=parseInt(link.dataset.refId,10);
+    const mode=link.dataset.refMode||'popup';
+    if(mode==='popup') openRefPopup(id, link);
+    else { closeRefPopup(); openRefLinkNav(id); }
+    return;
+  }
+  if(popup && popup.classList.contains('vis') && !e.target.closest('.ref-popup')) closeRefPopup();
+});
 
 function saveCeIfActive(){
   if(activeCeEl){ const id=parseInt(activeCeEl.dataset.id); if(id)saveCeBody(activeCeEl,id); }
@@ -3250,7 +3419,7 @@ function renderCompDetail(id) {
     const metaHtml = metaCells.length ? `<div class="comp-view-meta">${metaCells.map(([l,v])=>`<div class="comp-view-meta-cell"><div class="comp-view-meta-lbl">${esc(l)}</div><div class="comp-view-meta-val">${esc(v)}</div></div>`).join('')}</div>` : '';
     el.innerHTML = `<div class="comp-detail">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-        <button class="comp-detail-back" onclick="compOpenId=null;compDetailEdit=false;renderCompBody()">${ICO.back} Назад к списку</button>
+        ${refBackBtnHtml()}
         <button class="comp-edit-btn" style="margin-left:auto" onclick="compDetailEdit=true;renderCompDetail(${id})">✎ Редактировать</button>
       </div>
       <div class="comp-detail-head">
@@ -3272,7 +3441,7 @@ function renderCompDetail(id) {
     const catOpts = cats.map(c => `<option value="${esc(c.id)}"${e.catId===c.id?' selected':''}>${esc(c.icon)} ${esc(c.name)}</option>`).join('');
     el.innerHTML = `<div class="comp-detail">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-        <button class="comp-detail-back" onclick="compOpenId=null;compDetailEdit=false;renderCompBody()">${ICO.back} Назад к списку</button>
+        ${refBackBtnHtml()}
         <button class="comp-del-btn" style="margin-left:auto" onclick="compDeleteEntry(${id})">✕ Удалить запись</button>
         <button class="comp-edit-btn" style="border-color:var(--gold);color:var(--gold)" onclick="compDetailEdit=false;renderCompDetail(${id})">✓ Просмотр</button>
       </div>
@@ -3655,6 +3824,7 @@ function toggleNavMenu(){ renderNavMenu(); document.getElementById('nav-menu-ove
 function closeNavMenu(){ document.getElementById('nav-menu-overlay').classList.remove('open'); }
 
 function routeFromHash(){
+  refLinkStack=[]; // явная hash-навигация обнуляет цепочку возвратов по ref-ссылкам (заход 21)
   const h = (location.hash || '').replace('#','');
   if (h === 'classes') {
     // Legacy-ссылка (до редизайна навигации) — ведём в галерею классов первого источника
