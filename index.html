@@ -443,9 +443,11 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 /* Tables inside editor */
 .ab-body-ce table.ce-table{border-collapse:collapse;margin:6px 0;width:100%;}
 .ab-body-ce table.ce-table th,.ab-body-ce table.ce-table td{border:1px solid var(--border);padding:4px 8px;vertical-align:top;min-width:30px;}
-.ab-body-ce table.ce-table th{background:var(--panel2);color:var(--gold);font-weight:700;font-size:0.85em;font-family:var(--font-head);letter-spacing:0.4px;}
+.ab-body-ce table.ce-table th{background:var(--panel2);color:var(--gold);font-weight:700;font-size:0.85em;font-family:var(--font-head);letter-spacing:0.4px;position:relative;}
 .ab-body-ce table.ce-table td{background:rgba(0,0,0,0.1);}
 .ab-body-ce table.ce-table tr:hover td{background:rgba(255,255,255,0.04);}
+.ce-col-rh{position:absolute;right:0;top:0;bottom:0;width:4px;cursor:col-resize;background:transparent;}
+.ce-col-rh:hover,.ce-col-rh.active{background:rgba(158,124,50,0.35);}
 
 /* Dice table */
 .ab-body-ce table.dice-table th:first-child,.ab-body-ce table.dice-table td:first-child{color:var(--muted);width:56px;text-align:center;font-family:monospace;}
@@ -813,7 +815,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .home-body{max-width:1500px;margin:0 auto;padding:0 28px 80px;width:100%;flex:1;}
 .home-section-label{font-family:var(--font-head);font-size:0.72em;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:12px;margin-bottom:18px;}
 .home-section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(158,124,50,0.3),transparent);}
-.home-sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-items:start;}
+.home-sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-items:start;align-content:start;}
 .home-source-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:22px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
 .home-source-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--gold),var(--accent));opacity:0;transition:opacity .2s;}
 .home-source-card:hover{border-color:var(--accent);background:var(--panel2);}
@@ -1122,6 +1124,7 @@ const DEFAULT_HOME_LINKS=[
 let sortAlpha=false;
 let uiScale=1.0, abClickTimer=null; // 100% — дефолт для читателей (заход 18)
 let activeCeEl=null; // currently focused contenteditable
+let ceColResizing=null; // ресайз колонки таблицы (.ce-table) внутри текста умения/записи компендиума
 let uiTableFontSize=1.25; // em multiplier relative to body font
 let themeVars={}; // CSS variable overrides stored in localStorage
 
@@ -1455,12 +1458,25 @@ document.addEventListener('mousedown',e=>{
     }
     const startW=parseInt(window.getComputedStyle(th).width,10);
     colResizing={colId:th.dataset.col,startX:e.clientX,startW}; rh.classList.add('active'); document.body.classList.add('col-resizing'); e.preventDefault(); return; }
+  const cerh=e.target.closest('.ce-col-rh');
+  if(cerh){ const th=cerh.closest('th'); if(!th)return;
+    const tbl=th.closest('table.ce-table');
+    if(tbl){
+      // Пин всех th на текущей вычисленной ширине, чтобы соседние колонки не поехали при ресайзе
+      tbl.querySelectorAll('th').forEach(t=>{ const w=parseInt(window.getComputedStyle(t).width,10); if(w>0)t.style.width=w+'px'; });
+      tbl.style.width='auto';
+    }
+    const startW=parseInt(window.getComputedStyle(th).width,10);
+    ceColResizing={th,startX:e.clientX,startW,ceEl:th.closest('.ab-body-ce')};
+    cerh.classList.add('active'); document.body.classList.add('col-resizing'); e.preventDefault(); return; }
 });
 document.addEventListener('mousemove',e=>{
   if(colResizing){ const cls=getActive(); if(!cls)return; const dx=e.clientX-colResizing.startX; const nw=Math.max(24,colResizing.startW+dx); if(!cls.colWidths)cls.colWidths={}; cls.colWidths[colResizing.colId]=nw; const th=document.querySelector(`th[data-col="${CSS.escape(colResizing.colId)}"]`); if(th)th.style.width=nw+'px'; return; }
+  if(ceColResizing){ const dx=e.clientX-ceColResizing.startX; const nw=Math.max(24,ceColResizing.startW+dx); ceColResizing.th.style.width=nw+'px'; return; }
 });
 document.addEventListener('mouseup',()=>{
   if(colResizing){ const cls=getActive(); if(cls)save(); document.querySelectorAll('.col-rh.active').forEach(el=>el.classList.remove('active')); colResizing=null; document.body.classList.remove('col-resizing'); return; }
+  if(ceColResizing){ document.querySelectorAll('.ce-col-rh.active').forEach(el=>el.classList.remove('active')); document.body.classList.remove('col-resizing'); persistCeTableEl(ceColResizing.ceEl); ceColResizing=null; return; }
 });
 window.addEventListener('resize',()=>requestAnimationFrame(autoHAll));
 
@@ -2080,7 +2096,7 @@ function renderAbilities(cls){
         </div>
         <div class="ability-body-wrap"><div class="ability-body-wrap-inner"><div class="ability-body-wrap-pad">
           <div class="ab-body-ce" contenteditable="true" data-id="${a.id}"
-            onfocus="activeCeEl=this"
+            onfocus="activeCeEl=this;enhanceCeTables(this)"
             onblur="saveCeBody(this,${a.id})"
             oninput="debounceSaveCe(this,${a.id})"
             oncontextmenu="showCtxMenu(event,this);event.preventDefault()"
@@ -2926,6 +2942,26 @@ function saveCeIfActive(){
   if(activeCeEl){ const id=parseInt(activeCeEl.dataset.id); if(id)saveCeBody(activeCeEl,id); }
 }
 
+/* Ресайз колонок у таблиц (.ce-table) внутри текста умений/записей компендиума —
+   те же приёмы, что у таблицы класса, но ширина хранится прямо в HTML (style на <th>),
+   а не в отдельном объекте, т.к. вся таблица и так живёт как часть сохранённого текста. */
+function enhanceCeTables(root){
+  if(!root)return;
+  root.querySelectorAll('table.ce-table th').forEach(th=>{
+    if(!th.querySelector(':scope > .ce-col-rh')){
+      const rh=document.createElement('span');
+      rh.className='ce-col-rh';
+      rh.setAttribute('contenteditable','false');
+      th.appendChild(rh);
+    }
+  });
+}
+function persistCeTableEl(el){
+  if(!el)return;
+  if(el.dataset.id){ const id=parseInt(el.dataset.id); if(id)saveCeBody(el,id); }
+  else if(el.dataset.compId){ const id=parseInt(el.dataset.compId); if(id)compSaveBody(el,id); }
+}
+
 function promptInsertTable(){
   hideCtxMenu();
   const rows=parseInt(prompt('Строки:','3')||'3');
@@ -2948,7 +2984,7 @@ function insertCeTable(rows,cols,isDice){
   let html=`<table class="${cls}"${isDice?` data-dice="${arguments[2]||'d6'}"`:''}>`;
   // header row
   html+='<thead><tr>';
-  for(let c=0;c<cols;c++) html+=`<th contenteditable="true">${isDice&&c===0?'Бросок':('Колонка '+(c+1))}</th>`;
+  for(let c=0;c<cols;c++) html+=`<th contenteditable="true">${isDice&&c===0?'Бросок':('Колонка '+(c+1))}<span class="ce-col-rh" contenteditable="false"></span></th>`;
   html+='</tr></thead>';
   html+='<tbody>';
   for(let r=0;r<rows;r++){
@@ -2981,7 +3017,7 @@ function insertDiceTable(die){
   activeCeEl.focus();
   const sides=parseInt(die.replace(/[^0-9]/g,''))||6;
   let html=`<table class="ce-table dice-table" data-dice="${esc(die)}">`;
-  html+=`<thead><tr><th contenteditable="false"><div class="dice-roll-wrap">${esc(die)} <span class="dice-roll-btn" onclick="rollCeDice(this)">🎲 Бросок</span> <span class="dice-result-disp"></span></div></th><th contenteditable="true">Результат</th></tr></thead>`;
+  html+=`<thead><tr><th contenteditable="false"><div class="dice-roll-wrap">${esc(die)} <span class="dice-roll-btn" onclick="rollCeDice(this)">🎲 Бросок</span> <span class="dice-result-disp"></span></div><span class="ce-col-rh" contenteditable="false"></span></th><th contenteditable="true">Результат<span class="ce-col-rh" contenteditable="false"></span></th></tr></thead>`;
   html+='<tbody>';
   for(let i=1;i<=sides;i++) html+=`<tr data-min="${i}" data-max="${i}"><td contenteditable="true">${i}</td><td contenteditable="true">&nbsp;</td></tr>`;
   html+='</tbody></table><p><br></p>';
@@ -3530,7 +3566,7 @@ function renderCompDetail(id) {
       </div>
       <div class="comp-detail-body-wrap">
         <div class="ab-body-ce" contenteditable="true" data-comp-id="${id}"
-          onfocus="activeCeEl=this"
+          onfocus="activeCeEl=this;enhanceCeTables(this)"
           onblur="compSaveBody(this,${id})"
           oninput="compDebounceSave(this,${id})"
           oncontextmenu="showCtxMenu(event,this);event.preventDefault()"
