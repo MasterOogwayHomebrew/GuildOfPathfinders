@@ -14,6 +14,7 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-11 (21h) — ЛИНИЯ МЕЖДУ УРОВНЯМИ → ТАКАЯ ЖЕ ЗЕЛЁНАЯ, КАК МЕЖДУ УМЕНИЯМИ. Adam прислал скриншот с красными стрелками на золотой `.ab-level-group` border-bottom (между "Уровень N" группами): "эти жёлтые линии тоже замени на точно такие же зелёные и с таким же одинаковым отступом". `.ab-level-group{border-bottom:2px solid rgba(158,124,50,0.4)}` → `1px solid var(--accent)` (идентично `.ability-card` border-top), `padding:12px 0`→`26px 0` (было и так симметрично 12/12, но теперь совпадает с 26px у межумениевого разделителя — единый визуальный ритм по всей странице умений). Проверено Playwright: `borderBottomColor` rgb(78,122,92)=var(--accent), отступ сверху/снизу линии по 26px.
 2026-09-11 (21g) — СИММЕТРИЧНЫЙ ОТСТУП ВОКРУГ ЗЕЛЁНОЙ ЛИНИИ МЕЖДУ УМЕНИЯМИ. Adam прислал скриншот: отступ сверху от линии (26px, `.ab-level-body-pad` gap) и снизу от линии (16px, `.ability-card` padding-top) были разными — "пробел сделай и там и там одинаковым... нижнюю линию притяни как верхняя". `padding-top` увеличен с 16px до 26px (совпадает с gap) — теперь линия ровно посередине между соседними умениями. Проверено Playwright: `gapAboveLine`/`paddingTop` обе стороны = 26px на всех парах карточек.
 2026-09-11 (21f) — УБРАНО ПОДЧЁРКИВАНИЕ У ИМЕНИ УМЕНИЯ. Adam: "эту желтый разделитель можно впринципе убрать раз у нас есть зеленый который раскрывается" — `.ab-name-disp` border-bottom (rgba(196,152,72,...), введён в заходе 21d) убран вместе с hover-веткой в `.ability-header:hover .ab-name-disp` и `padding-bottom`/своим `border-color` transition — раз зелёная граница между карточками умений (`.ability-card:not(:first-child)` border-top, заход 21d) уже даёт достаточное разделение, жёлтое подчёркивание под именем избыточно. Имя умения теперь просто цветной текст без подчёркивания.
 2026-09-11 (21e) — ЦВЕТА "УРОВЕНЬ"/ИМЯ УМЕНИЯ УПРОЩЕНЫ + РИМСКИЕ ЦИФРЫ В НАЗВАНИЯХ. Adam: "придумал надпись уровень сделаем светло зеленой а надпись умения желтой и все не паримся" — вместо тонкой настройки border/подчёркиваний (заход 21d) просто развёл два текста цветом:
@@ -382,7 +383,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
    .ab-level-group/.ability-header больше НЕ имеют фона/рамки/тени — только текст-заголовок на фоне
    страницы, разделители между уровнями — тонкая нижняя линия вместо бокса. */
 .abilities-list{display:flex;flex-direction:column;gap:0;}
-.ab-level-group{background:transparent;border:none;border-bottom:2px solid rgba(158,124,50,0.4);border-radius:0;overflow:visible;box-shadow:none;padding:12px 0;}
+.ab-level-group{background:transparent;border:none;border-bottom:1px solid var(--accent);border-radius:0;overflow:visible;box-shadow:none;padding:26px 0;}
 .ab-level-group:last-child{border-bottom:none;}
 .ab-level-header{display:flex;align-items:center;gap:10px;padding:0;cursor:pointer;user-select:none;background:transparent;}
 .ab-level-header:hover .ab-level-title{color:#93bfa1;}
