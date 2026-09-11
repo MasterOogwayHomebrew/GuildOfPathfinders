@@ -14,6 +14,20 @@
 Полная архитектура, правила перевода, глоссарий — в персистентной памяти Claude (не в этом файле), см. areas/class-builder-architecture.md.
 
 CHANGELOG (новое сверху):
+2026-09-11 (21e) — ЦВЕТА "УРОВЕНЬ"/ИМЯ УМЕНИЯ УПРОЩЕНЫ + РИМСКИЕ ЦИФРЫ В НАЗВАНИЯХ. Adam: "придумал надпись уровень сделаем светло зеленой а надпись умения желтой и все не паримся" — вместо тонкой настройки border/подчёркиваний (заход 21d) просто развёл два текста цветом:
+  1) `.ab-level-title` ("Уровень N") — было `var(--gold2)`, стало светло-зелёный `#8fd6a0` (hover `#a8e6b4`).
+  2) `.ab-name-disp` (название умения) — было `var(--text)`, стало жёлтый `#e8c84a` (hover `#f2da7a`, border-bottom тоже чуть ярче). Правка в 2 местах: сам CSS-класс + инлайн `nameColor` fallback в `renderAbilities()` (у умений подкласса цвет всё ещё берётся из цвета подкласса `sc`, это не трогали).
+  Разделители/подчёркивания из захода 21d (граница между уровнями, между умениями, RU/EN divider) не убирались — остаются как есть, только текстовые цвета сверху добавлены.
+  Также в `patch_fighter_step1.js`: Adam — "где умения идут по счету... цифры делай без скобок и римские" — переименованы все парные/тройные умения класса (Второе дыхание/Дополнительная атака/Всплеск действия/Непреклонность) с формата `(1)/(2)/(3)` на `I/II/III` без скобок, и в RU, и в EN названии (`Второе дыхание I [Second Wind I]` и т.д.). Внутренние текстовые ссылки на эти умения в теле других фич (например "см. «Непреклонность» на 9-м уровне") не трогались — они и так ссылаются на базовое имя без суффикса.
+  Также поправлена память (`/areas/class-builder-translation.md`): библиотеки Черты/Приёмы — ПУСТЫЕ контейнеры, Шаг 3 и Шаг 4 для Воина ещё не начаты (предыдущая заметка ошибочно намекала на возможное содержимое).
+  ПРОВЕРЕНО Playwright: таблица класса и карточки умений — Roman-нумерация корректна на всех уровнях (I/II/III), 0 console errors, полный регресс пройден.
+2026-09-11 (21d) — РАЗДЕЛИТЕЛИ: ИМЯ УМЕНИЯ / МЕЖДУ УРОВНЯМИ / МЕЖДУ УМЕНИЯМИ / RU-EN. Заход 21c поправил цвет названия умения (var(--gold2)→var(--text)), но название всё равно сливалось с телом умения ниже (оба на близких тёплых тонах) — Adam прислал 2 скриншота: "надо их подчеркнуть или как-то отделить". Плюс попросил разную "жирность" у трёх разных типов разделителей на странице, которые раньше все выглядели одинаково тускло:
+  1) `.ab-name-disp` (название умения) — добавлен `border-bottom:1px solid rgba(196,152,72,0.35)` + `padding-bottom:4px` + `display:block` (тянется на всю ширину `.ab-name-wrap`, т.к. родитель `display:flex;flex-direction:column` без `align-items` — дефолт `stretch`). На hover граница ярче (`rgba(158,124,50,0.6)`) синхронно с текстом.
+  2) `.ab-level-group` border-bottom (разделитель МЕЖДУ уровнями) — Adam: "сделай жирной" — было `1px solid var(--border)` (тёмно-зелёный, почти не виден), стало `2px solid rgba(158,124,50,0.4)` (золотистый, толще).
+  3) `.ability-card:not(:first-child)` border-top (разделитель МЕЖДУ умениями внутри уровня) — было `border-top:none` (полностью убран в заходе 21 вместе с плашками). Adam: "тонкий зелёный разделитель, который у нас есть в контекстном меню" — т.е. по образцу стиля "Тонкий" (`.rt-div-thin{height:1px}`) из панели стилей разделителя редактора, но зелёный, не золотой: `border-top:1px solid var(--accent)`.
+  4) Разделитель МЕЖДУ RU и EN текстом внутри тела умения — раньше это была просто пустая пустая строка `<p><br></p>` без всякого визуала. Adam: "затухающий разделитель" — теперь между RU- и EN-абзацами явно вставляется `<hr class="rt-div rt-div-fading">` (тот же класс, что даёт пункт "Затухающий" в панели стилей разделителя редактора). Это касается ТОЛЬКО новых умений, вставляемых JS-патчами при переводе (никаких старых данных на сайте ещё нет) — зафиксировано как новый стандарт формата body в памяти перевода классов (взамен старого `<p>RU</p><p><br></p><p>EN</p>`).
+  ВАЖНО — КОРРЕКЦИЯ (не код, но критично для перевода): Adam уточнил, что библиотеки "Черты"/"Приёмы" на сайте существуют, но ОБЕ ПУСТЫЕ — записей в них нет. Предыдущая память ошибочно предполагала, что они уже заполнены переводом Воина с прошлой попытки. Поправлено в `/areas/class-builder-translation.md`.
+  Патч `patch_fighter_step1.js` перевыпущен с новым RU/EN-разделителем в шаблоне `mk()`. ПРОВЕРЕНО Playwright: все 4 правки видны на скриншотах (подчёркивание имени, толстая золотая линия между уровнями, тонкая зелёная между умениями, затухающая между RU/EN), border-значения подтверждены через getComputedStyle, полный регресс — 0 ошибок в консоли.
 2026-09-11 (21c) — ЦВЕТ НАЗВАНИЙ УМЕНИЙ СЛИВАЛСЯ С ЗАГОЛОВКОМ УРОВНЯ + СТАРТ ПЕРЕВОДА ВОИНА. Adam прислал 2 скриншота: "цвета одинаковые поэтому на общем фоне смешивается всё, самим умениям наверное лучше дать другой цвет" — после захода 21 (окончательный отказ от плашек) заголовок уровня (`.ab-level-title`) и название умения без подкласса (`.ab-name-disp`, через инлайн-стиль `nameColor` в `renderAbilities()`) красились в один и тот же `var(--gold2)` — на тёмном фоне визуально сливались, особенно с учётом что hover-переход `.ability-header:hover .ab-name-disp{color:var(--gold)}` из-за инлайн-стиля с тем же приоритетом фактически не работал. Правка: `nameColor` дефолт `var(--gold2)`→`var(--text)` (тёплый кремовый, был уже дефолтом самого CSS-класса до инлайн-переопределения) — теперь чёткая иерархия: золотой жирный заголовок уровня vs кремовое название умения, и hover-подсветка на золото заработала попутно. Умения с цветом подкласса (`sc`) не затронуты — по-прежнему красятся в `sub.color`.
   Начат перевод Воина (Alternate Fighter) — Шаг 1 (тело класса: интро/лор, атрибуты hp/владения/снаряжение, все базовые фичи 1-20 ур. кроме архетипных слотов) + Шаг 2 частично (11 вкладок подклассов с цветами; умения-затычки по уровням архетипов — ещё не сделаны, в следующей порции). Приёмы/Черты в компендиум НЕ добавлялись — по словам Adam, уже существуют с прошлой попытки перевода. Доставлено отдельным JS-патч-скриптом (`patch_fighter_step1.js`) для консоли браузера — index.html сам по себе классы не хранит (Firestore), поэтому патч, а не правка файла. Проверено Playwright: скрипт выполняется без ошибок, создаёт класс с 20 уровнями/23 умениями/11 подклассами/4 кастомными колонками (Боевые стили/Известно приёмов/Кость приёма/Кости приёмов), рендер текста и мини-таблицы (Намётанный глаз) корректны, 0 ошибок в консоли.
 2026-09-11 (21b) — УРОВНИ ОТКРЫТЫ ПО УМОЛЧАНИЮ + ПЛАВНАЯ АНИМАЦИЯ РАСКРЫТИЯ. Два коротких доп. запроса после доставки захода 21, плюс вопрос про удаление класса (ответ ниже, без изменений кода).
@@ -364,11 +378,11 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
    .ab-level-group/.ability-header больше НЕ имеют фона/рамки/тени — только текст-заголовок на фоне
    страницы, разделители между уровнями — тонкая нижняя линия вместо бокса. */
 .abilities-list{display:flex;flex-direction:column;gap:0;}
-.ab-level-group{background:transparent;border:none;border-bottom:1px solid var(--border);border-radius:0;overflow:visible;box-shadow:none;padding:12px 0;}
+.ab-level-group{background:transparent;border:none;border-bottom:2px solid rgba(158,124,50,0.4);border-radius:0;overflow:visible;box-shadow:none;padding:12px 0;}
 .ab-level-group:last-child{border-bottom:none;}
 .ab-level-header{display:flex;align-items:center;gap:10px;padding:0;cursor:pointer;user-select:none;background:transparent;}
-.ab-level-header:hover .ab-level-title{color:var(--gold);}
-.ab-level-title{font-family:var(--font-head);font-size:1.2em;font-weight:700;letter-spacing:0.6px;color:var(--gold2);flex:1;transition:color .15s;}
+.ab-level-header:hover .ab-level-title{color:#a8e6b4;}
+.ab-level-title{font-family:var(--font-head);font-size:1.2em;font-weight:700;letter-spacing:0.6px;color:#8fd6a0;flex:1;transition:color .15s;}
 .ab-level-count{font-size:0.75em;color:var(--muted);background:transparent;border:none;padding:0;flex-shrink:0;}
 .ab-level-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;}
 .ab-level-group.open .ab-level-toggle{transform:rotate(90deg);}
@@ -376,14 +390,14 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ab-level-group.open .ab-level-body{grid-template-rows:1fr;}
 .ab-level-body-inner{overflow:hidden;min-height:0;}
 .ab-level-body-pad{display:flex;flex-direction:column;padding:10px 0 0 6px;gap:12px;}
-.ability-card:not(:first-child){border-top:none;}
+.ability-card:not(:first-child){border-top:1px solid var(--accent);}
 .ability-header{display:flex;align-items:center;gap:8px;padding:0;cursor:pointer;user-select:none;background:transparent;}
-.ability-header:hover .ab-name-disp{color:var(--gold);}
+.ability-header:hover .ab-name-disp{color:#f2da7a;border-bottom-color:rgba(196,152,72,0.6);}
 .drag-handle{display:none;}
 .ab-toggle{font-size:0.69em;color:var(--muted);flex-shrink:0;transition:transform .15s;margin-left:auto;}
 .ability-card.open .ab-toggle{transform:rotate(90deg);}
 .ab-name-wrap{flex:1;min-width:60px;display:flex;flex-direction:column;gap:1px;overflow:hidden;}
-.ab-name-disp{font-family:var(--font-head);font-size:1.05em;font-weight:600;letter-spacing:0.5px;color:var(--text);overflow:visible;text-overflow:clip;white-space:normal;transition:color .15s;}
+.ab-name-disp{font-family:var(--font-head);font-size:1.05em;font-weight:600;letter-spacing:0.5px;color:#e8c84a;overflow:visible;text-overflow:clip;white-space:normal;transition:color .15s,border-color .15s;border-bottom:1px solid rgba(196,152,72,0.35);padding-bottom:4px;display:block;}
 .ab-name-edit{width:100%;background:transparent;border:none;border-bottom:1px solid var(--gold);outline:none;font-size:1em;font-weight:700;color:var(--gold2);font-family:var(--font);}
 .ab-sl-hint-line{font-size:0.69em;color:var(--muted);font-style:italic;line-height:1.2;}
 .ab-type-in{background:transparent;border:none;outline:none;font-size:0.85em;font-style:italic;color:var(--muted);width:150px;font-family:var(--font);cursor:text;}
@@ -2043,7 +2057,7 @@ function renderAbilities(cls){
       const bodyHtml=a.body||'';
       const sub=a.subId?subMap[a.subId]:null;
       const sc=sub?.color||null;
-      const nameColor=sc?sc:'var(--text)';
+      const nameColor=sc?sc:'#e8c84a';
       return `<div class="ability-card${a.open?' open':''}" data-id="${a.id}">
         <div class="ability-header" onclick="abHeaderClick(event,${a.id})">
           <span class="drag-handle" onclick="event.stopPropagation()">⠿</span>
