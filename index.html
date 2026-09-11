@@ -331,10 +331,10 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .lv-input.slot-input{color:var(--accent);}
 .lv-input.slot-input:focus{color:var(--gold2);}
 .feature-tags{display:flex;flex-wrap:wrap;gap:2px;}
-.feature-tag{font-size:0.88em;padding:4px 11px;background:var(--accent);border:1px solid rgba(0,0,0,0.25);color:rgba(0,0,0,0.5);text-shadow:0 1px 0 rgba(255,255,255,0.3);font-weight:700;transition:all .15s;white-space:nowrap;font-family:var(--font);opacity:1;border-radius:var(--radius-pill);}
+.feature-tag{font-size:0.88em;padding:4px 11px;background:var(--accent);border:1px solid rgba(0,0,0,0.25);color:var(--text);text-shadow:0 -1px 0 rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08);font-weight:700;transition:all .15s;white-space:nowrap;font-family:var(--font);opacity:1;border-radius:var(--radius-pill);}
 .feature-tag.sub-tag{opacity:1;}
 .feature-tag[data-ab-id]{cursor:pointer;}
-.feature-tag[data-ab-id]:hover{filter:brightness(1.12);}
+.feature-tag[data-ab-id]:hover{filter:brightness(1.2);}
 .feature-tag[data-ab-id].ft-highlight{box-shadow:0 0 0 2px var(--accent);}
 @keyframes ab-flash{0%{box-shadow:0 0 0 3px var(--accent);}100%{box-shadow:none;}}
 .ab-jump-flash{animation:ab-flash 0.8s ease-out;}
@@ -356,9 +356,9 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 
 /* SUBCLASSES */
 .sub-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
-.sub-tab{font-size:0.77em;letter-spacing:1px;padding:6px 14px;border:1px solid rgba(0,0,0,0.28);background:var(--accent);color:rgba(0,0,0,0.5);text-shadow:0 1px 0 rgba(255,255,255,0.3);font-weight:700;cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
-.sub-tab:hover{filter:brightness(1.12);}
-.sub-tab.active{box-shadow:inset 0 0 0 2px rgba(0,0,0,0.4);filter:brightness(1.06);}
+.sub-tab{font-size:0.77em;letter-spacing:1px;padding:6px 14px;border:1px solid rgba(0,0,0,0.3);background:var(--accent);color:var(--text);text-shadow:0 -1px 0 rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08);font-weight:700;cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
+.sub-tab:hover{filter:brightness(1.25);}
+.sub-tab.active{box-shadow:inset 0 0 0 2px var(--gold2);}
 .add-sub-btn{font-size:0.77em;letter-spacing:1px;padding:5px 10px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
 .add-sub-btn:hover{border-color:var(--sub);color:var(--sub);}
 .sub-editor{background:var(--panel);border:1px solid var(--border);padding:12px;margin-bottom:10px;border-radius:var(--radius);}
@@ -2221,6 +2221,18 @@ function _settingsHtml() {
   </div>`;
 }
 
+/* Приглушённая заливка вкладки подкласса — смешивает исходный (яркий) цвет подкласса с тёмным
+   фоном панели (--panel), чтобы залитая кнопка не "кричала" неоном поверх нефритовой палитры.
+   Граница/подпись сохраняют исходный sc — приглушается только сама заливка. */
+function mutedSubColor(hex){
+  const h=(hex||'').replace('#','');
+  if(h.length!==6) return hex;
+  const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+  const mix=(c,base,amt)=>Math.round(c*amt+base*(1-amt));
+  const amt=0.42; // доля исходного цвета в приглушённой заливке (0=чистый панельный фон, 1=чистый цвет подкласса)
+  return `rgb(${mix(r,28,amt)},${mix(g,38,amt)},${mix(b,32,amt)})`;
+}
+
 /* MAIN RENDER */
 function renderMain(){
   const cls=getActive();
@@ -2279,7 +2291,7 @@ function renderMain(){
         <div class="sub-tab${activeSubId===null?' active':''}" onclick="selectSub(null)" style="${activeSubId===null?'border-color:var(--border);color:var(--muted);background:rgba(255,255,255,0.04);':''}">Без подкласса</div>
         ${subs.map(s=>{
           const sc=s.color||null;
-          const styl=sc?`background:${sc};border-color:${sc};`:'';
+          const styl=sc?`background:${mutedSubColor(sc)};border-color:${sc};`:'';
           return `<div class="sub-tab${s.id===activeSubId?' active':''}" onclick="selectSub(${s.id})" style="${styl}">${esc(s.name)}</div>`;
         }).join('')}
         <button class="add-sub-btn" onclick="addSubPrompt()">+ Подкласс</button>
