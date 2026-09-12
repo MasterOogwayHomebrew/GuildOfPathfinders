@@ -356,7 +356,7 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 
 /* SUBCLASSES */
 .sub-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
-.sub-tab{font-size:0.77em;letter-spacing:1px;padding:6px 14px;border:1px solid rgba(0,0,0,0.3);background:var(--accent);color:var(--text);text-shadow:0 -1px 0 rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08);font-weight:700;cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
+.sub-tab{font-size:0.77em;letter-spacing:1px;padding:6px 14px;border:1px solid rgba(0,0,0,0.3);background:rgb(49,73,57);color:#fff;text-shadow:0 -1px 0 rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08);font-weight:700;cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
 .sub-tab:hover{filter:brightness(1.25);}
 .sub-tab.active{box-shadow:inset 0 0 0 2px var(--gold2);}
 .add-sub-btn{font-size:0.77em;letter-spacing:1px;padding:5px 10px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--font);border-radius:var(--radius-pill);}
@@ -2062,7 +2062,7 @@ function renderLvRow(cls,lv,normalCols,casterCols){
       const sl=(cls.subLevels||[]).find(x=>x.id===-abId);
       const sub=sl?(cls.subclasses||[]).find(s=>s.id===sl.subId):null;
       const sc=sub?.color||null;
-      const s=sc?`background:${mutedSubColor(sc)};border-color:${sc};color:var(--text);text-shadow:0 -1px 0 rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08);`:'';
+      const s=sc?`background:${mutedSubColor(sc)};border-color:${sc};color:#fff;text-shadow:0 -1px 0 rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08);`:'';
       const linkedAb=sl?(cls.abilities||[]).find(a=>a.slvId===sl.id):null;
       const subDat=linkedAb?` data-ab-id="${linkedAb.id}"`:''
       const subCtx=linkedAb?` oncontextmenu="showTagCtxMenu(event,${linkedAb.id})"`:'';
@@ -3537,10 +3537,10 @@ function renderCompDetail(id) {
     // ---- VIEW MODE ----
     const metaCells = [
       e.level!=null ? ['Уровень', String(e.level)] : null,
-      e.source ? ['Источник', e.source] : null,
       e.chars  ? ['Класс', e.chars] : null,
-      e.prof   ? ['Владения', e.prof] : null,
       e.req    ? ['Требования', e.req] : null,
+      e.source ? ['Применение', e.source] : null,
+      e.prof   ? ['Владения', e.prof] : null,
       e.other  ? ['Другое', e.other] : null,
     ].filter(Boolean);
     const metaHtml = metaCells.length ? `<div class="comp-view-meta">${metaCells.map(([l,v])=>`<div class="comp-view-meta-cell"><div class="comp-view-meta-lbl">${esc(l)}</div><div class="comp-view-meta-val">${esc(v)}</div></div>`).join('')}</div>` : '';
@@ -3556,7 +3556,7 @@ function renderCompDetail(id) {
             ${e.nameEn?`<div class="comp-view-nameen">${esc(e.nameEn)}</div>`:''}
           </div>
         </div>
-        <div class="comp-view-cat" style="color:${cat.color}">${compCatIconHtml(cat, 1.05)} ${esc(cat.name)}${e.source?` <span style="color:var(--muted);font-weight:400;margin-left:8px;font-size:0.9em">${esc(e.source)}</span>`:''}</div>
+        <div class="comp-view-cat" style="color:${cat.color}">${compCatIconHtml(cat, 1.05)} ${esc(cat.name)}</div>
         ${metaHtml}
       </div>
       <div class="comp-detail-body-wrap">
@@ -3585,21 +3585,21 @@ function renderCompDetail(id) {
             <div class="comp-meta-label">Уровень</div>
             <input class="comp-meta-inp" value="${esc(e.level!=null?String(e.level):'')}" placeholder="—" style="width:55px" oninput="compUpdEntry(${id},'level',this.value===''?null:(parseInt(this.value)||null))">
           </div>
-          <div class="comp-meta-field">
-            <div class="comp-meta-label">Источник</div>
-            <input class="comp-meta-inp" value="${esc(e.source||'')}" placeholder="PHB" style="width:80px" oninput="compUpdEntry(${id},'source',this.value)">
-          </div>
           <div class="comp-meta-field" style="flex:1;min-width:120px">
             <div class="comp-meta-label">Класс</div>
             <input class="comp-meta-inp" value="${esc(e.chars||'')}" placeholder="Воин, Варвар" style="width:100%" oninput="compUpdEntry(${id},'chars',this.value)">
           </div>
           <div class="comp-meta-field" style="flex:1;min-width:100px">
-            <div class="comp-meta-label">Владения</div>
-            <input class="comp-meta-inp" value="${esc(e.prof||'')}" style="width:100%" oninput="compUpdEntry(${id},'prof',this.value)">
-          </div>
-          <div class="comp-meta-field" style="flex:1;min-width:100px">
             <div class="comp-meta-label">Требования</div>
             <input class="comp-meta-inp" value="${esc(e.req||'')}" style="width:100%" oninput="compUpdEntry(${id},'req',this.value)">
+          </div>
+          <div class="comp-meta-field" style="flex:1;min-width:100px">
+            <div class="comp-meta-label">Применение</div>
+            <input class="comp-meta-inp" value="${esc(e.source||'')}" placeholder="1 действие" style="width:100%" oninput="compUpdEntry(${id},'source',this.value)">
+          </div>
+          <div class="comp-meta-field" style="flex:1;min-width:100px">
+            <div class="comp-meta-label">Владения</div>
+            <input class="comp-meta-inp" value="${esc(e.prof||'')}" style="width:100%" oninput="compUpdEntry(${id},'prof',this.value)">
           </div>
           <div class="comp-meta-field" style="flex:1;min-width:80px">
             <div class="comp-meta-label">Другое</div>
