@@ -3385,6 +3385,7 @@ function renderCompTopbar() {
     <button class="comp-view-btn${compView==='name'?' active':''}" onclick="compView='name';renderCompTopbar();renderCompLegend();renderCompBody()">Название</button>
     <button class="comp-view-btn${compView==='type'?' active':''}" onclick="compView='type';renderCompTopbar();renderCompLegend();renderCompBody()">Тип</button>
     <button class="comp-view-btn${compView==='level'?' active':''}" onclick="compView='level';renderCompTopbar();renderCompLegend();renderCompBody()">Уровень</button>
+    <button class="comp-view-btn${compView==='chars'?' active':''}" onclick="compView='chars';renderCompTopbar();renderCompLegend();renderCompBody()">Классы</button>
     <div class="comp-sep"></div>
     <button class="comp-add-btn" onclick="compAddEntry()">+ Добавить</button>
     <button class="comp-settings-btn${document.getElementById('comp-settings-panel').classList.contains('open')?' active':''}" onclick="toggleCompSettings()" title="Управление категориями">${ICO.gear}</button>
@@ -3421,6 +3422,7 @@ function renderCompBody() {
   const entries = compFilterEntries();
   if (compView === 'type')  renderCompByType(el, entries);
   else if (compView === 'name')  renderCompByName(el, entries);
+  else if (compView === 'chars') renderCompByChars(el, entries);
   else renderCompByLevel(el, entries);
   if (compDragMode) setTimeout(initCompEntryDrag, 0);
 }
@@ -3493,6 +3495,30 @@ function renderCompByLevel(el, entries) {
     const colsHtml = compSplitColumns(sorted.map(e => compEntryHtml(e, compGetCat(e.catId))));
     html += `<div class="comp-group">
       <div class="comp-group-label" style="color:var(--muted);border-bottom-color:var(--border)">Уровень&nbsp;${esc(k)}</div>
+      <div class="comp-group-entries">${colsHtml}</div>
+    </div>`;
+  }
+  el.innerHTML = html || `<div style="padding:40px;text-align:center;color:var(--muted)">Ничего не найдено</div>`;
+}
+
+/* ---------- CLASSES VIEW ---------- */
+function renderCompByChars(el, entries) {
+  const groups = {};
+  for (const e of entries) {
+    const raw = (e.chars || '').trim();
+    const list = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : ['—'];
+    for (const cls of list) {
+      if (!groups[cls]) groups[cls] = [];
+      groups[cls].push(e);
+    }
+  }
+  const keys = Object.keys(groups).sort((a, b) => { if (a === '—') return 1; if (b === '—') return -1; return a.localeCompare(b, 'ru'); });
+  let html = '';
+  for (const k of keys) {
+    const sorted = groups[k].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru'));
+    const colsHtml = compSplitColumns(sorted.map(e => compEntryHtml(e, compGetCat(e.catId))));
+    html += `<div class="comp-group">
+      <div class="comp-group-label" style="color:var(--muted);border-bottom-color:var(--border)">${esc(k)}</div>
       <div class="comp-group-entries">${colsHtml}</div>
     </div>`;
   }
