@@ -441,6 +441,8 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ctx-div-opt:hover{border-color:var(--gold);background:rgba(158,124,50,0.12);}
 
 /* Tables inside editor */
+.ce-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;margin:6px 0;}
+.ce-table-scroll table.ce-table{margin:0;}
 .ab-body-ce table.ce-table{border-collapse:collapse;margin:6px 0;width:100%;}
 .ab-body-ce table.ce-table th,.ab-body-ce table.ce-table td{border:1px solid var(--border);padding:4px 8px;vertical-align:top;min-width:30px;}
 .ab-body-ce table.ce-table th{background:var(--panel2);color:var(--gold);font-weight:700;font-size:0.85em;font-family:var(--font-head);letter-spacing:0.4px;position:relative;}
@@ -2148,7 +2150,7 @@ function renderAbilities(cls){
             oninput="debounceSaveCe(this,${a.id})"
             oncontextmenu="showCtxMenu(event,this);event.preventDefault()"
             onkeydown="ceKeydown(event)"
-          >${bodyHtml}</div>
+          >${wrapScrollTables(bodyHtml)}</div>
         </div></div></div>
       </div>`;
     }).join('');
@@ -2946,7 +2948,7 @@ function openRefPopup(entryId, linkEl){
   panel.innerHTML = e ? `<span class="ref-popup-close" onclick="closeRefPopup()">✕</span>
     <div class="ref-popup-title">${esc(e.name||'—')}</div>
     ${e.nameEn?`<div class="ref-popup-nameen">${esc(e.nameEn)}</div>`:''}
-    <div class="ref-popup-body">${e.body||'<span style="color:var(--muted);font-style:italic">Описание отсутствует</span>'}</div>`
+    <div class="ref-popup-body">${e.body?wrapScrollTables(e.body):'<span style="color:var(--muted);font-style:italic">Описание отсутствует</span>'}</div>`
     : `<span class="ref-popup-close" onclick="closeRefPopup()">✕</span><div class="ref-popup-body" style="font-style:italic;color:var(--muted)">Запись не найдена — возможно, была удалена.</div>`;
   refPopupLinkEl=linkEl;
   panel.classList.add('vis');
@@ -3158,6 +3160,16 @@ function ceTableDelete(e){
 
 /* UTIL */
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Оборачивает каждую <table class="ce-table"...>...</table> (включая dice-table, у него оба класса
+// сразу) в скроллящийся контейнер — иначе на мобильном широкие таблицы просто обрезаются вправо
+// без возможности прокрутки. Работает поверх уже готового HTML тела умения/записи компендиума,
+// ничего не меняет в хранимых данных — применяется в момент вставки в DOM (renderAbilities,
+// renderCompDetail, openRefPopup).
+function wrapScrollTables(html) {
+  if (!html) return html;
+  return html.replace(/<table\b[^>]*class="[^"]*\bce-table\b[^"]*"[\s\S]*?<\/table>/g, m => `<div class="ce-table-scroll">${m}</div>`);
+}
 
 /* ============================================================
    MOBILE SUPPORT
@@ -3586,7 +3598,7 @@ function renderCompDetail(id) {
         ${metaHtml}
       </div>
       <div class="comp-detail-body-wrap">
-        <div class="comp-view-body">${e.body||'<span style="color:var(--muted);font-style:italic">Описание отсутствует</span>'}</div>
+        <div class="comp-view-body">${e.body?wrapScrollTables(e.body):'<span style="color:var(--muted);font-style:italic">Описание отсутствует</span>'}</div>
       </div>
     </div>`;
   } else {
@@ -3640,7 +3652,7 @@ function renderCompDetail(id) {
           oninput="compDebounceSave(this,${id})"
           oncontextmenu="showCtxMenu(event,this);event.preventDefault()"
           onkeydown="ceKeydown(event)"
-        >${e.body||''}</div>
+        >${wrapScrollTables(e.body)||''}</div>
       </div>
     </div>`;
   }
