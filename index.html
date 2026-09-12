@@ -652,6 +652,10 @@ body.comp-mode #screen-compendium{display:flex!important;}
 .comp-back-btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:5px 10px;cursor:pointer;font-size:0.82em;font-family:var(--font);transition:all .15s;white-space:nowrap;flex-shrink:0;border-radius:var(--radius-sm);}
 .comp-back-btn:hover{border-color:var(--gold);color:var(--gold);}
 .comp-lib-title{font-family:var(--font);font-size:0.85em;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gold2);opacity:0.85;white-space:nowrap;flex-shrink:0;padding:0 4px;}
+.comp-orig-btn{display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 9px;cursor:pointer;font-size:0.78em;font-family:var(--font);transition:all .15s;white-space:nowrap;flex-shrink:0;border-radius:var(--radius-sm);}
+.comp-orig-btn:hover{border-color:var(--gold);color:var(--gold);}
+.comp-orig-btn.empty{border-style:dashed;opacity:0.6;}
+.comp-orig-btn.empty:hover{opacity:1;}
 .comp-search-wrap{position:relative;flex:1;min-width:130px;}
 .comp-search-inp{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 8px 5px 26px;font-size:0.85em;outline:none;font-family:var(--font);border-radius:var(--radius-sm);}
 .comp-search-inp:focus{border-color:var(--gold);}
@@ -3229,6 +3233,29 @@ function currentLibName(){
   const lib=(src?.libraries||[]).find(l=>l.id===openLibId);
   return lib?lib.name:'';
 }
+/* Заход 22: ссылка на оригинал (laserllama) — одна на библиотеку, Adam: "чтобы я мог туда ссылку
+   вставить, одна общая в одной библиотеке" + "как у класса, только одну — двойной клик по кнопке,
+   вставил, сохранил". Храним в самом объекте библиотеки (source.libraries[].originalUrl), правит
+   только owner через нативный prompt() — отдельная модалка не нужна для одного поля. */
+function compCurrentLib(){
+  if(!openLibId) return null;
+  const src=sources.find(s=>s.id===currentSourceId);
+  return (src?.libraries||[]).find(l=>l.id===openLibId) || null;
+}
+function openCompLibOriginal(){
+  const lib=compCurrentLib();
+  if(lib?.originalUrl) window.open(lib.originalUrl,'_blank','noopener');
+}
+function editCompLibOriginalUrl(){
+  if(!isOwner) return;
+  const lib=compCurrentLib();
+  if(!lib) return;
+  const url=prompt('Ссылка на оригинал (GM Binder/Reddit и т.п.):', lib.originalUrl||'');
+  if(url===null) return;
+  lib.originalUrl=url.trim();
+  saveSources();
+  renderCompTopbar();
+}
 let compSearch = '';
 let compFilters = { catId: '', level: '' };
 let compDragMode = false;
@@ -3383,9 +3410,15 @@ function renderCompTopbar() {
   const hasNull = COMP.entries.some(e=>e.level==null);
   const lvlOpts = `<option value="">Уровень</option>${lvlList.map(v=>`<option value="${v}"${compFilters.level===String(v)?' selected':''}>${v}</option>`).join('')}${hasNull?`<option value="null"${compFilters.level==='null'?' selected':''}>—</option>`:''}`;
   const libLabel = currentLibName();
+  const curLib = compCurrentLib();
+  const origBtnHtml = curLib ? (curLib.originalUrl
+    ? `<button class="comp-orig-btn" onclick="openCompLibOriginal()" ondblclick="event.stopPropagation();${isOwner?'editCompLibOriginalUrl()':''}" title="Открыть оригинал на laserllama${isOwner?' (двойной клик — изменить ссылку)':''}">${ICO.link} Оригинал</button>`
+    : (isOwner ? `<button class="comp-orig-btn empty" onclick="editCompLibOriginalUrl()" title="Добавить ссылку на оригинал">${ICO.link} + Оригинал</button>` : '')
+  ) : '';
   tb.innerHTML = `
     <button class="nav-menu-btn nav-toggle-btn" onclick="toggleNavMenu()" title="Меню навигации">${ICO.menu} Меню</button>
     <span class="comp-lib-title">${esc(libLabel)}</span>
+    ${origBtnHtml}
     <div class="comp-search-wrap">
       <span class="comp-search-icon">${ICO.search}</span>
       <input class="comp-search-inp" placeholder="Поиск по разделу" value="${esc(compSearch)}" oninput="compSearch=this.value;renderCompBody()">
