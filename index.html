@@ -68,6 +68,9 @@ CHANGELOG (новое сверху):
   10) Изучение next.dnd.su / TTG-Club (новая редакция) на предмет UI-идей — Adam попросил "посети сайты и подсмотри что-то полезное". Не выполнено в этом заходе — вернуться отдельным шагом (не блокирует остальные пункты).
   ПОПУТНО: перевод предметов/оружия/брони с next.dnd.su/equipment (было "ОТКРЫТО" в заходе 19) — ЗАВЕРШЁН в персистентной памяти Claude (не в этом файле, см. areas/class-builder-architecture.md / topics/dnd-glossary.md) отдельным шагом того же дня, до начала этого захода правок сайта.
   ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, новый qa_r19.js + полный регресс qa_backbtn.js/qa_sections.js/qa_mobgap.js): отсутствие рамок у ability-card, золотой цвет названия, объединённый заголовок уровня без бейджа, отсутствие add-ab-btn, ПКМ по строке таблицы → модалка → умение создаётся с введённым названием на нужном уровне с форс-открытием группы, ПКМ по плашке в таблице → удаление умения, реалтайм-ре-рендер списка при смене уровня умения подкласса, панель стиля разделителя открывается и вставляет `<hr class="rt-div rt-div-fading">`, пустая иконка категории возвращает `""` без "?", звёзды у заголовка (2 шт в `.home-title`, 2 шт в `.action-bar-title`), кнопка "Главная" в drawer'е — та же рамка что у "Назад" с SVG-иконкой — везде 0 ошибок в консоли (кроме ожидаемых `ERR_TUNNEL_CONNECTION_FAILED` от Google Fonts CDN в изолированной тестовой среде без сети — не баг приложения).
+2026-09-13 (21) — ФИКС ОТОБРАЖЕНИЯ ЗАПИСЕЙ В БИБЛИОТЕКЕ.
+  БАГ: записи созданные в библиотеке без категорий получали `catId='origin'` (фолбэк на первую дефолтную категорию из 'styles'). Такие записи не отображались в кастомной библиотеке, т.к. `catIds.has('origin')` → false, а 'origin' существует глобально → прежний фикс (`!COMP.categories.some(...)`) его не ловил.
+  РЕШЕНИЕ: `COMP.entries` получили поле `libId` (какая библиотека "родная" для записи). Фолбэк в `compAddEntry` изменён с `'origin'` на `null` — запись без категорий теперь создаётся с `catId:null, libId:openLibId`. Фильтр в `compFilterEntries` заменён на `catIds.has(e.catId) || e.libId === openLibId` — запись показывается если её catId в текущей библиотеке ИЛИ её libId совпадает с текущей библиотекой. Миграция `healCompEntryLibIds()` выставляет `libId` для старых записей (inferred из catId → категория → libId, фолбэк 'styles'). renderCompByType уже показывает записи с `catId:null` в группе "Без категории" (добавлено в заходе 20).
 2026-09-13 (20) — АВТО-АЛФАВИТ В БИБЛИОТЕКАХ + НАВИГАЦИОННЫЕ СТРЕЛКИ В ДЕТАЛИ ЗАПИСИ. Два запроса от Adam по скриншотам.
   1) БАГ СОРТИРОВКИ в виде "по типу" (`renderCompByType`): записи шли в порядке добавления, а не по алфавиту. Причина: `sort((a,b) => (a.order||0)-(b.order||0) || localeCompare)` — `order` (монотонный счётчик из Firestore) был первичным ключом сортировки, алфавит работал только как tiebreaker среди одинаковых `order` (а они все разные). Фикс: убран `(a.order||0)-(b.order||0)` — оставлен чистый `localeCompare(b.name, 'ru')`. Остальные виды (name/level/chars) уже были алфавитными — не тронуты.
   2) СТРЕЛКИ ← → между записями в детали компендиума (как в галерее). Новые глобалы `detailNavList[]` + `detailNavIndex`. Новая функция `compBuildNavList()` — строит плоский список id в порядке текущего вида (type: категории по order, внутри алфавит; name: чистый алфавит; level: по уровню потом алфавит; chars: по классам потом алфавит, dedup через Set). Новая функция `compNavTo(id)` — листает к соседней записи без сброса фильтров. `compOpenEntry(id)` теперь строит navList при открытии. В `renderCompDetail` (режим просмотра) добавлены две кнопки `.comp-nav-arrow` в тулбар: "← предыдущая" + "→ следующая" (ICO.back + scaleX(-1)), появляются только если в navList > 1 записи, disabled если дошли до края. CSS: `.comp-nav-arrow` (рядом с `.comp-detail-back`, те же border/radius/hover/disabled-opacity).
@@ -1314,6 +1317,22 @@ function healCompCategoryLibIds(){
   let healed=false;
   (COMP.categories||[]).forEach(c=>{
     if(!c.libId){ c.libId = (c.section==='maneuvers') ? 'maneuvers' : 'styles'; healed=true; }
+  });
+  if(healed) saveComp();
+}
+
+/* Заход 2026-09-13 (21): entries получили поле libId (в какой библиотеке создана запись) —
+   нужно для фильтрации записей без catId или с catId чужой библиотеки.
+   Для старых записей выводим libId из catId → категория → libId категории.
+   Если catId нет или категория не найдена — фолбэк 'styles'. */
+function healCompEntryLibIds(){
+  let healed=false;
+  (COMP.entries||[]).forEach(e=>{
+    if(!e.libId){
+      const cat = COMP.categories.find(c=>c.id===e.catId);
+      e.libId = (cat&&cat.libId) || 'styles';
+      healed=true;
+    }
   });
   if(healed) saveComp();
 }
@@ -3460,8 +3479,9 @@ function compFilterEntries() {
   if (currentSourceId) list = list.filter(e => (e.sourceId||'laserllama') === currentSourceId);
   if (openLibId) {
     const catIds = new Set(compCatsInSection().map(c => c.id));
-    // Включаем записи этой библиотеки + "осиротевшие" (без catId или catId не существует ни в одной категории)
-    list = list.filter(e => catIds.has(e.catId) || !e.catId || !COMP.categories.some(c => c.id === e.catId));
+    // Запись принадлежит этой библиотеке если: catId есть в текущей библиотеке ИЛИ libId записи совпадает с ней
+    // (libId проставляется при создании записи; миграция healCompEntryLibIds выставляет его для старых записей)
+    list = list.filter(e => catIds.has(e.catId) || e.libId === openLibId);
   }
   const q = compSearch.trim().toLowerCase();
   if (q) list = list.filter(e => (e.name||'').toLowerCase().includes(q) || (e.nameEn||'').toLowerCase().includes(q) || (e.body||'').replace(/<[^>]+>/g,'').toLowerCase().includes(q));
@@ -3785,10 +3805,10 @@ function compUpdEntry(id, field, value) {
 /* ---------- ADD / DELETE ---------- */
 function compAddEntry() {
   const cats = compCatsInSection().sort((a,b) => a.order - b.order);
-  const catId = compFilters.catId || (cats[0] ? cats[0].id : 'origin');
+  const catId = compFilters.catId || (cats[0] ? cats[0].id : null);
   const id = COMP.nextId++;
   const maxOrd = Math.max(0, ...COMP.entries.filter(e => e.catId === catId).map(e => e.order||0));
-  COMP.entries.push({ id, catId, name: 'Новая запись', nameEn: '', level: null, source: '', chars: '', prof: '', req: '', other: '', body: '', order: maxOrd + 1, sourceId: currentSourceId||'laserllama' });
+  COMP.entries.push({ id, catId, libId: openLibId, name: 'Новая запись', nameEn: '', level: null, source: '', chars: '', prof: '', req: '', other: '', body: '', order: maxOrd + 1, sourceId: currentSourceId||'laserllama' });
   saveComp(); compOpenId = id; compDetailEdit = true; renderCompBody();
 }
 
@@ -4199,6 +4219,7 @@ async function _boot() {
   healOrphanCompEntries();
   healSourceSections();
   healCompCategoryLibIds();
+  healCompEntryLibIds();
   if (classes.length > 0) activeId = classes[0].id;
   renderSidebar();
   renderMain();
