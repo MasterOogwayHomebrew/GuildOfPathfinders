@@ -536,6 +536,12 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ctx-color-dot:hover{transform:scale(1.15);border-color:var(--gold);}
 .ctx-color-custom{padding:3px 14px 7px;font-size:0.8em;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:6px;}
 .ctx-color-custom:hover{color:var(--gold);}
+/* Submenu panel */
+#ctx-submenu{position:fixed;background:var(--panel2);border:1px solid var(--border);box-shadow:4px 4px 18px rgba(0,0,0,0.7);z-index:601;min-width:180px;display:none;padding:4px 0;}
+#ctx-submenu.vis{display:block;}
+.ctx-item-has-sub{justify-content:space-between;}
+.ctx-item-has-sub .ctx-sub-arrow{color:var(--muted);font-size:0.8em;padding-left:8px;flex-shrink:0;}
+.ctx-sub-active,.ctx-sub-active:hover{background:rgba(158,124,50,0.12)!important;color:var(--gold)!important;}
 /* input[type=color] used as swatches — reset browser chrome */
 input[type=color].sp-color-swatch{-webkit-appearance:none;appearance:none;padding:0;}
 input[type=color].sp-color-swatch::-webkit-color-swatch-wrapper{padding:0;border-radius:1px;}
@@ -1059,6 +1065,7 @@ if (location.hash === '#classes' || /^#src\/[^/]+\/classes$/.test(location.hash)
 
 <!-- Context menu -->
 <div class="ab-ctx-menu" id="ctx-menu"></div>
+<div id="ctx-submenu" onmouseenter="cancelHideCtxSub()" onmouseleave="scheduleHideCtxSub()"></div>
 <div class="ref-popup" id="ref-popup"></div>
 
 
@@ -2777,66 +2784,90 @@ document.addEventListener('selectionchange',()=>{
 
 /* Context menu */
 let ctxCeEl=null;
-function showCtxMenu(e,el){
-  ctxCeEl=el;
-  // Save current selection so foreColor can restore it after color picker
-  const sel=window.getSelection();
-  savedForeRange=(sel&&sel.rangeCount)?sel.getRangeAt(0).cloneRange():null;
-  const menu=document.getElementById('ctx-menu');
-  const insideTable=e.target.closest('table.ce-table');
+let _ctxSubTimer=null;
+function hideCtxSub(){
+  clearTimeout(_ctxSubTimer); _ctxSubTimer=null;
+  const sub=document.getElementById('ctx-submenu');
+  if(sub){sub.classList.remove('vis'); sub.innerHTML='';}
+  document.querySelectorAll('.ctx-sub-active').forEach(el=>el.classList.remove('ctx-sub-active'));
+}
+function scheduleHideCtxSub(){_ctxSubTimer=setTimeout(hideCtxSub,150);}
+function cancelHideCtxSub(){clearTimeout(_ctxSubTimer);_ctxSubTimer=null;}
+function showCtxSub(e,subId){
+  cancelHideCtxSub();
+  const sub=document.getElementById('ctx-submenu'); if(!sub) return;
+  document.querySelectorAll('.ctx-sub-active').forEach(el=>el.classList.remove('ctx-sub-active'));
+  e.currentTarget.classList.add('ctx-sub-active');
+  const fgColors=['#e0d8c0','#ffffff','#c0c0c0','#808080','#c04040','#c07040','#c0b840','#60a060','#4a90c0','#9060b8','#b8982a','#d4b84a','#4a6080','#6a4a8a','#c06090','#40a0a0','#e88040','#60d060','#8090ff','#ff90b0'];
   let html='';
-  // Text format group
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('bold')"><span class="ctx-icon">𝐁</span>Жирный</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('italic')"><span class="ctx-icon">𝐼</span>Курсив</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('underline')"><span class="ctx-icon"><u>U</u></span>Подчёркнутый</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('strikeThrough')"><span class="ctx-icon"><s>S</s></span>Зачёркнутый</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('code')"><span class="ctx-icon">⌨</span>Код</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('mark')"><span class="ctx-icon">🖍</span>Выделение</div>`;
-  html+=`<div class="ctx-sep"></div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(1)"><span class="ctx-icon">H1</span>Заголовок 1</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(2)"><span class="ctx-icon">H2</span>Заголовок 2</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(3)"><span class="ctx-icon">H3</span>Заголовок 3</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleBlockquote()"><span class="ctx-icon">❝</span>Цитата</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertUnorderedList')"><span class="ctx-icon">≡</span>Список</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertOrderedList')"><span class="ctx-icon">①</span>Нумер. список</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();insertCeHr()"><span class="ctx-icon">—</span>Разделитель</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxDividerPanel()"><span class="ctx-icon">◈</span>Стиль разделителя ▸</div>`;
-  html+=`<div id="ctx-divider-panel" style="display:none">
-    <div class="ctx-div-opts">
-      <div class="ctx-div-opt" onmousedown="event.preventDefault();insertCeHr('thin')" title="Тонкий">▬</div>
-      <div class="ctx-div-opt" style="font-weight:900" onmousedown="event.preventDefault();insertCeHr('bold')" title="Жирный">▬</div>
-      <div class="ctx-div-opt" onmousedown="event.preventDefault();insertCeHr('fading')" title="Затухающий">╌</div>
-    </div>
-    <label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">${ICO.palette}</span> Цвет разделителя...<input type="color" class="color-input-overlay" value="${lastDividerColor||'#9e7c32'}" onchange="applyDividerColorFromInput(this)"></label>
-  </div>`;
-  html+=`<div class="ctx-sep"></div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertTable()"><span class="ctx-icon">▦</span>Вставить таблицу</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertDiceTable()"><span class="ctx-icon">🎲</span>Таблица бросков</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxRefPanel()"><span class="ctx-icon">🔗</span>Ссылка на запись ▸</div>`;
-  html+=`<div id="ctx-ref-panel" style="display:none">
-    <input type="text" class="ctx-ref-search" id="ctx-ref-search-inp" placeholder="Поиск записи..." oninput="ctxRefSearch(this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
-    <div class="ctx-ref-results" id="ctx-ref-results"></div>
-  </div>`;
-  if(insideTable){
+  if(subId==='fmt'){
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('bold')"><span class="ctx-icon">𝐁</span>Жирный</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('italic')"><span class="ctx-icon">𝐼</span>Курсив</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('underline')"><span class="ctx-icon"><u>U</u></span>Подчёркнутый</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('strikeThrough')"><span class="ctx-icon"><s>S</s></span>Зачёркнутый</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('code')"><span class="ctx-icon">⌨</span>Код</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('mark')"><span class="ctx-icon">🖍</span>Выделение</div>`;
     html+=`<div class="ctx-sep"></div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxColorGrid()"><span class="ctx-icon">${ICO.palette}</span>Цвет текста ▸</div>`;
+    html+=`<div id="ctx-color-panel" style="display:none"><div class="ctx-color-grid">${fgColors.map(c=>`<div class="ctx-color-dot" style="background:${c}" title="${c}" onmousedown="event.preventDefault();applyForeColor('${c}')"></div>`).join('')}</div><label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">+</span> Свой цвет...<input type="color" class="color-input-overlay" value="#ffffff" onchange="applyForeColorFromInput(this)"></label></div>`;
+  } else if(subId==='blocks'){
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(1)"><span class="ctx-icon">H1</span>Заголовок 1</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(2)"><span class="ctx-icon">H2</span>Заголовок 2</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(3)"><span class="ctx-icon">H3</span>Заголовок 3</div>`;
+    html+=`<div class="ctx-sep"></div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleBlockquote()"><span class="ctx-icon">❝</span>Цитата</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertUnorderedList')"><span class="ctx-icon">≡</span>Список</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertOrderedList')"><span class="ctx-icon">①</span>Нумер. список</div>`;
+  } else if(subId==='insert'){
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();insertCeHr()"><span class="ctx-icon">—</span>Разделитель</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxDividerPanel()"><span class="ctx-icon">◈</span>Стиль разделителя ▸</div>`;
+    html+=`<div id="ctx-divider-panel" style="display:none"><div class="ctx-div-opts"><div class="ctx-div-opt" onmousedown="event.preventDefault();insertCeHr('thin')" title="Тонкий">▬</div><div class="ctx-div-opt" style="font-weight:900" onmousedown="event.preventDefault();insertCeHr('bold')" title="Жирный">▬</div><div class="ctx-div-opt" onmousedown="event.preventDefault();insertCeHr('fading')" title="Затухающий">╌</div></div><label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">${ICO.palette}</span> Цвет разделителя...<input type="color" class="color-input-overlay" value="${lastDividerColor||'#9e7c32'}" onchange="applyDividerColorFromInput(this)"></label></div>`;
+    html+=`<div class="ctx-sep"></div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertTable()"><span class="ctx-icon">▦</span>Вставить таблицу</div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertDiceTable()"><span class="ctx-icon">🎲</span>Таблица бросков</div>`;
+    html+=`<div class="ctx-sep"></div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxRefPanel()"><span class="ctx-icon">🔗</span>Ссылка на запись ▸</div>`;
+    html+=`<div id="ctx-ref-panel" style="display:none"><input type="text" class="ctx-ref-search" id="ctx-ref-search-inp" placeholder="Поиск записи..." oninput="ctxRefSearch(this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()"><div class="ctx-ref-results" id="ctx-ref-results"></div></div>`;
+  } else if(subId==='table'){
     html+=`<div class="ctx-item" onmousedown="event.preventDefault();ceTableAddRow(event)"><span class="ctx-icon">+</span>Добавить строку</div>`;
     html+=`<div class="ctx-item" onmousedown="event.preventDefault();ceTableAddCol(event)"><span class="ctx-icon">+</span>Добавить столбец</div>`;
+    html+=`<div class="ctx-sep"></div>`;
     html+=`<div class="ctx-item danger" onmousedown="event.preventDefault();ceTableDelRow(event)"><span class="ctx-icon">−</span>Удалить строку</div>`;
     html+=`<div class="ctx-item danger" onmousedown="event.preventDefault();ceTableDelCol(event)"><span class="ctx-icon">−</span>Удалить столбец</div>`;
     html+=`<div class="ctx-item danger" onmousedown="event.preventDefault();ceTableDelete(event)"><span class="ctx-icon">✕</span>Удалить таблицу</div>`;
   }
+  sub.innerHTML=html;
+  sub.classList.add('vis');
+  // Position submenu to the right of the hovered item
+  const itemRect=e.currentTarget.getBoundingClientRect();
+  const menu=document.getElementById('ctx-menu');
+  const menuRect=menu.getBoundingClientRect();
+  sub.style.left='0'; sub.style.top='0'; sub.style.display='block';
+  const sw=sub.offsetWidth, sh=sub.offsetHeight;
+  sub.style.display='';
+  let sx=menuRect.right+2, sy=itemRect.top;
+  if(sx+sw>window.innerWidth-4) sx=menuRect.left-sw-2;
+  if(sy+sh>window.innerHeight-4) sy=window.innerHeight-sh-4;
+  sub.style.left=sx+'px'; sub.style.top=sy+'px';
+}
+function showCtxMenu(e,el){
+  ctxCeEl=el;
+  const sel=window.getSelection();
+  savedForeRange=(sel&&sel.rangeCount)?sel.getRangeAt(0).cloneRange():null;
+  hideCtxSub();
+  const menu=document.getElementById('ctx-menu');
+  const insideTable=e.target.closest('table.ce-table');
+  let html='';
+  html+=`<div class="ctx-item ctx-item-has-sub" onmouseenter="showCtxSub(event,'fmt')"><span class="ctx-icon">𝐁</span>Форматирование<span class="ctx-sub-arrow">▸</span></div>`;
+  html+=`<div class="ctx-item ctx-item-has-sub" onmouseenter="showCtxSub(event,'blocks')"><span class="ctx-icon">H</span>Блоки<span class="ctx-sub-arrow">▸</span></div>`;
+  html+=`<div class="ctx-item ctx-item-has-sub" onmouseenter="showCtxSub(event,'insert')"><span class="ctx-icon">+</span>Вставить<span class="ctx-sub-arrow">▸</span></div>`;
+  if(insideTable) html+=`<div class="ctx-item ctx-item-has-sub" onmouseenter="showCtxSub(event,'table')"><span class="ctx-icon">▦</span>Таблица<span class="ctx-sub-arrow">▸</span></div>`;
   html+=`<div class="ctx-sep"></div>`;
-  // Foreground color
-  const fgColors=['#e0d8c0','#ffffff','#c0c0c0','#808080','#c04040','#c07040','#c0b840','#60a060','#4a90c0','#9060b8','#b8982a','#d4b84a','#4a6080','#6a4a8a','#c06090','#40a0a0','#e88040','#60d060','#8090ff','#ff90b0'];
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxColorGrid()"><span class="ctx-icon">${ICO.palette}</span>Цвет текста ▸</div>`;
-  html+=`<div id="ctx-color-panel" style="display:none"><div class="ctx-color-grid">${fgColors.map(c=>`<div class="ctx-color-dot" style="background:${c}" title="${c}" onmousedown="event.preventDefault();applyForeColor('${c}')"></div>`).join('')}</div><label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">+</span> Свой цвет...<input type="color" class="color-input-overlay" value="#ffffff" onchange="applyForeColorFromInput(this)"></label></div>`;
-  html+=`<div class="ctx-sep"></div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();removeAllFormat()"><span class="ctx-icon">✕</span>Убрать форматирование</div>`;
+  html+=`<div class="ctx-item" onmousedown="event.preventDefault();removeAllFormat()" onmouseenter="scheduleHideCtxSub()"><span class="ctx-icon">✕</span>Убрать форматирование</div>`;
   menu.innerHTML=html;
   menu.classList.add('vis');
   let x=e.clientX, y=e.clientY;
-  menu.style.left='0'; menu.style.top='0';
-  menu.style.display='block';
+  menu.style.left='0'; menu.style.top='0'; menu.style.display='block';
   const mw=menu.offsetWidth, mh=menu.offsetHeight;
   menu.style.display='';
   if(x+mw>window.innerWidth-4)x=window.innerWidth-mw-4;
@@ -2845,10 +2876,11 @@ function showCtxMenu(e,el){
 }
 function hideCtxMenu(){
   document.getElementById('ctx-menu').classList.remove('vis');
+  hideCtxSub();
   ctxCeEl=null;
 }
 document.addEventListener('click',e=>{
-  if(!e.target.closest('#ctx-menu')) hideCtxMenu();
+  if(!e.target.closest('#ctx-menu')&&!e.target.closest('#ctx-submenu')) hideCtxMenu();
 });
 
 /* CE insert helpers */
