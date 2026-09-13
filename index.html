@@ -462,6 +462,8 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 /* Заход 21: ссылки на записи компендиума внутри текста умения/записи — переход или попап */
 .ref-link{color:var(--gold2);text-decoration:underline;text-decoration-style:dotted;text-decoration-color:rgba(158,124,50,0.55);cursor:pointer;}
 .ref-link:hover{color:var(--gold);}
+.ext-link{color:var(--gold2);text-decoration:underline;text-decoration-style:dotted;text-decoration-color:rgba(158,124,50,0.55);cursor:pointer;}
+.ext-link:hover{color:var(--gold);}
 .ref-popup{position:fixed;z-index:500;width:min(360px,90vw);background:var(--panel);border:1px solid var(--gold);border-radius:var(--radius-sm);box-shadow:0 10px 30px rgba(0,0,0,0.55);padding:14px 34px 14px 16px;display:none;}
 .ref-popup.vis{display:block;}
 .ref-popup-close{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--muted);font-size:1.1em;line-height:1;}
@@ -2826,6 +2828,7 @@ function showCtxSub(e,subId){
     html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertTable()"><span class="ctx-icon">▦</span>Вставить таблицу</div>`;
     html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertDiceTable()"><span class="ctx-icon">🎲</span>Таблица бросков</div>`;
     html+=`<div class="ctx-sep"></div>`;
+    html+=`<div class="ctx-item" onmousedown="event.preventDefault();insertExternalLink()"><span class="ctx-icon">🌐</span>Внешняя ссылка</div>`;
     html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxRefPanel()"><span class="ctx-icon">🔗</span>Ссылка на запись ▸</div>`;
     html+=`<div id="ctx-ref-panel" style="display:none"><input type="text" class="ctx-ref-search" id="ctx-ref-search-inp" placeholder="Поиск записи..." oninput="ctxRefSearch(this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()"><div class="ctx-ref-results" id="ctx-ref-results"></div></div>`;
   } else if(subId==='table'){
@@ -2928,6 +2931,16 @@ function ctxRefSearch(q){
       </span>
     </div>`;
   }).join('') : `<div class="ctx-ref-empty">Ничего не найдено</div>`;
+}
+function insertExternalLink(){
+  if(savedForeRange){const sel=window.getSelection();sel.removeAllRanges();sel.addRange(savedForeRange);}
+  const url=prompt('URL ссылки:','https://');
+  if(!url||!url.trim()) return;
+  const sel=window.getSelection();
+  const hasSelection=sel&&sel.rangeCount&&!sel.getRangeAt(0).collapsed;
+  const label=hasSelection?sel.toString():url.trim();
+  document.execCommand('insertHTML',false,`<a class="ext-link" href="${esc(url.trim())}" target="_blank" rel="noopener">${esc(label)}</a>`);
+  hideCtxMenu(); saveCeIfActive();
 }
 function insertRefLink(entryId, mode){
   if(!ctxCeEl) return;
