@@ -3492,7 +3492,7 @@ function renderCompByType(el, entries) {
   const cats = compCatsInSection().sort((a,b) => a.order - b.order);
   let html = '';
   for (const cat of cats) {
-    const cEntries = entries.filter(e => e.catId === cat.id).sort((a,b) => (a.order||0)-(b.order||0) || (a.name||'').localeCompare(b.name||'','ru'));
+    const cEntries = entries.filter(e => e.catId === cat.id).sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
     if (!cEntries.length && (compSearch || compFilters.catId || compFilters.level)) continue;
     const colsHtml = compSplitColumns(cEntries.map(e => compEntryHtml(e, cat)));
     const zoneHtml = compDragMode ? `<div class="comp-drop-zone" data-cat-id="${esc(cat.id)}">⬇ Перетащи сюда</div>` : (!cEntries.length ? `<div class="comp-empty-zone">—</div>` : '');
