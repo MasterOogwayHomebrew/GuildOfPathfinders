@@ -68,6 +68,9 @@ CHANGELOG (новое сверху):
   10) Изучение next.dnd.su / TTG-Club (новая редакция) на предмет UI-идей — Adam попросил "посети сайты и подсмотри что-то полезное". Не выполнено в этом заходе — вернуться отдельным шагом (не блокирует остальные пункты).
   ПОПУТНО: перевод предметов/оружия/брони с next.dnd.su/equipment (было "ОТКРЫТО" в заходе 19) — ЗАВЕРШЁН в персистентной памяти Claude (не в этом файле, см. areas/class-builder-architecture.md / topics/dnd-glossary.md) отдельным шагом того же дня, до начала этого захода правок сайта.
   ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, новый qa_r19.js + полный регресс qa_backbtn.js/qa_sections.js/qa_mobgap.js): отсутствие рамок у ability-card, золотой цвет названия, объединённый заголовок уровня без бейджа, отсутствие add-ab-btn, ПКМ по строке таблицы → модалка → умение создаётся с введённым названием на нужном уровне с форс-открытием группы, ПКМ по плашке в таблице → удаление умения, реалтайм-ре-рендер списка при смене уровня умения подкласса, панель стиля разделителя открывается и вставляет `<hr class="rt-div rt-div-fading">`, пустая иконка категории возвращает `""` без "?", звёзды у заголовка (2 шт в `.home-title`, 2 шт в `.action-bar-title`), кнопка "Главная" в drawer'е — та же рамка что у "Назад" с SVG-иконкой — везде 0 ошибок в консоли (кроме ожидаемых `ERR_TUNNEL_CONNECTION_FAILED` от Google Fonts CDN в изолированной тестовой среде без сети — не баг приложения).
+2026-09-13 (20) — АВТО-АЛФАВИТ В БИБЛИОТЕКАХ + НАВИГАЦИОННЫЕ СТРЕЛКИ В ДЕТАЛИ ЗАПИСИ. Два запроса от Adam по скриншотам.
+  1) БАГ СОРТИРОВКИ в виде "по типу" (`renderCompByType`): записи шли в порядке добавления, а не по алфавиту. Причина: `sort((a,b) => (a.order||0)-(b.order||0) || localeCompare)` — `order` (монотонный счётчик из Firestore) был первичным ключом сортировки, алфавит работал только как tiebreaker среди одинаковых `order` (а они все разные). Фикс: убран `(a.order||0)-(b.order||0)` — оставлен чистый `localeCompare(b.name, 'ru')`. Остальные виды (name/level/chars) уже были алфавитными — не тронуты.
+  2) СТРЕЛКИ ← → между записями в детали компендиума (как в галерее). Новые глобалы `detailNavList[]` + `detailNavIndex`. Новая функция `compBuildNavList()` — строит плоский список id в порядке текущего вида (type: категории по order, внутри алфавит; name: чистый алфавит; level: по уровню потом алфавит; chars: по классам потом алфавит, dedup через Set). Новая функция `compNavTo(id)` — листает к соседней записи без сброса фильтров. `compOpenEntry(id)` теперь строит navList при открытии. В `renderCompDetail` (режим просмотра) добавлены две кнопки `.comp-nav-arrow` в тулбар: "← предыдущая" + "→ следующая" (ICO.back + scaleX(-1)), появляются только если в navList > 1 записи, disabled если дошли до края. CSS: `.comp-nav-arrow` (рядом с `.comp-detail-back`, те же border/radius/hover/disabled-opacity).
 2026-09-08 (19) — МОБИЛЬНЫЙ ФИКС ТОПБАРА + КАСТОМНЫЕ СТРЕЛКИ НАЗАД + РЕДИЗАЙН КАРТОЧЕК УМЕНИЙ ПО УРОВНЯМ + СВОБОДНЫЕ РАЗДЕЛЫ ИСТОЧНИКА. Заход по 5 мобильным скриншотам Adam + отдельный запрос на редизайн умений + архитектурная переделка источников (после уточняющего вопроса).
   1) БАГ "невидимый топбар" на мобильной главной и в библиотеках (галерея источников/классы) — Adam: "главная страница видео сверху как будто там не видимый топ бар, далее в библиотеках также как будто на верху невидимый топбар". Причина: `body{padding-top:44px}` резервировал место под `#mob-topbar` ГЛОБАЛЬНО, а `#mob-topbar` физически лежит внутри `#app-view` (класс-билдер) — на других топ-уровневых экранах (`#home-view`, `#screen-compendium`, `#classes-gallery-view`) этого топбара просто нет, но пустой отступ 44px оставался, создавая "невидимый бар"-пустоту сверху. Фикс: `padding-top:44px` перенесён с `body` на `#app-view` (единственное место, где топбар реально есть). Заодно найден и убран дублирующий МЁРТВЫЙ `@media(max-width:768px){#screen-compendium{padding-top:44px;}}` — та же ошибка, а `.comp-topbar` там самодостаточен (свой "☰ Меню").
   2) Кнопки "← Назад"/"На главную" — Adam: "кнопки на главну и назад надо сделать больше и стрелки сделать кастомные а не то что там есть". Добавлена новая иконка `ICO.back` (SVG-стрелка, тот же стиль что остальные `ICO.*`). Заменены текстовые "←"/"◀" на `${ICO.back}` в 4 местах: `#reference-back-btn`, `#gallery-back-btn` (статичная HTML-разметка — SVG продублирован литералом, т.к. `${ICO.*}` доступен только в JS-шаблонах), и 2× `.comp-detail-back` (JS-шаблон `renderCompBody()`). Кнопки укрупнены: добавлена рамка `border:1px solid var(--border)` (hover → var(--gold)), padding увеличен, font-weight:600 — теперь это настоящие кнопки, а не текстовые ссылки. Классы: `.comp-detail-back`, `.source-home-link`.
@@ -714,6 +717,9 @@ body.comp-mode #screen-compendium{display:flex!important;}
 .comp-detail{display:flex;flex-direction:column;width:100%;}
 .comp-detail-back{display:inline-flex;align-items:center;gap:8px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:0.92em;font-weight:600;font-family:var(--font);padding:7px 14px;margin-bottom:12px;transition:all .15s;border-radius:var(--radius-sm);}
 .comp-detail-back:hover{border-color:var(--gold);color:var(--gold);}
+.comp-nav-arrow{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:all .15s;border-radius:var(--radius-sm);margin-bottom:12px;padding:0;}
+.comp-nav-arrow:hover:not([disabled]){border-color:var(--gold);color:var(--gold);}
+.comp-nav-arrow[disabled]{opacity:0.3;cursor:default;}
 .comp-detail-head{background:var(--panel2);padding:12px 14px 10px;border:1px solid var(--border);}
 .comp-detail-name-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
 .comp-detail-name{font-size:1.25em;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;font-family:var(--font);flex:1;min-width:120px;padding:2px 4px;}
@@ -3263,6 +3269,8 @@ let compDragMode = false;
 let compOpenId = null;
 let compDetailEdit = false; // false = view mode, true = edit mode
 let compBodyTimer = null;
+let detailNavList = []; // плоский список id записей в порядке текущего вида — для стрелок ← →
+let detailNavIndex = -1;
 
 const DEFAULT_COMP_CATS = [
   { id: 'origin',     name: 'Черта происхождения',      icon: '⚙', color: '#5a8a5a', order: 0, section: 'traits', libId: 'styles' },
@@ -3499,7 +3507,7 @@ function renderCompByType(el, entries) {
   const cats = compCatsInSection().sort((a,b) => a.order - b.order);
   let html = '';
   for (const cat of cats) {
-    const cEntries = entries.filter(e => e.catId === cat.id).sort((a,b) => (a.order||0)-(b.order||0) || (a.name||'').localeCompare(b.name||'','ru'));
+    const cEntries = entries.filter(e => e.catId === cat.id).sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
     if (!cEntries.length && (compSearch || compFilters.catId || compFilters.level)) continue;
     const colsHtml = compSplitColumns(cEntries.map(e => compEntryHtml(e, cat)));
     const zoneHtml = compDragMode ? `<div class="comp-drop-zone" data-cat-id="${esc(cat.id)}">⬇ Перетащи сюда</div>` : (!cEntries.length ? `<div class="comp-empty-zone">—</div>` : '');
@@ -3590,9 +3598,54 @@ function compEntryHtml(e, cat) {
   </div>`;
 }
 
+/* Строит плоский список id в том порядке, в котором записи стоят в текущем виде/фильтрах —
+   используется для стрелок ← → в детальном виде (заход 2026-09-13). */
+function compBuildNavList() {
+  const entries = compFilterEntries();
+  if (compView === 'name') {
+    return [...entries].sort((a,b) => (a.name||'').localeCompare(b.name||'','ru')).map(e => e.id);
+  }
+  if (compView === 'level') {
+    const groups = {};
+    for (const e of entries) {
+      const k = e.level != null ? String(e.level) : '—';
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(e);
+    }
+    const keys = Object.keys(groups).sort((a,b) => { if(a==='—')return 1; if(b==='—')return -1; return Number(a)-Number(b); });
+    return keys.flatMap(k => groups[k].sort((a,b) => (a.name||'').localeCompare(b.name||'','ru')).map(e => e.id));
+  }
+  if (compView === 'chars') {
+    const groups = {};
+    for (const e of entries) {
+      const list = (e.chars||'').trim() ? e.chars.split(',').map(s=>s.trim()).filter(Boolean) : ['—'];
+      for (const cls of list) { if (!groups[cls]) groups[cls]=[]; groups[cls].push(e); }
+    }
+    const keys = Object.keys(groups).sort((a,b) => { if(a==='—')return 1; if(b==='—')return -1; return a.localeCompare(b,'ru'); });
+    const seen = new Set();
+    return keys.flatMap(k => groups[k].sort((a,b) => (a.name||'').localeCompare(b.name||'','ru')).map(e => e.id).filter(id => !seen.has(id) && seen.add(id)));
+  }
+  // 'type' view (default) — категории по order, внутри алфавит (как в renderCompByType)
+  const cats = compCatsInSection().sort((a,b) => a.order - b.order);
+  return cats.flatMap(cat =>
+    entries.filter(e => e.catId === cat.id)
+           .sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'))
+           .map(e => e.id)
+  );
+}
+
+function compNavTo(id) {
+  detailNavIndex = detailNavList.indexOf(id);
+  compOpenId = id;
+  compDetailEdit = false;
+  renderCompBody();
+}
+
 function compOpenEntry(id) {
   if (compDragMode) return;
   compDetailEdit = false;
+  detailNavList = compBuildNavList();
+  detailNavIndex = detailNavList.indexOf(id);
   compOpenId = id;
   renderCompBody();
 }
@@ -3616,9 +3669,18 @@ function renderCompDetail(id) {
       e.other  ? ['Другое', e.other] : null,
     ].filter(Boolean);
     const metaHtml = metaCells.length ? `<div class="comp-view-meta">${metaCells.map(([l,v])=>`<div class="comp-view-meta-cell"><div class="comp-view-meta-lbl">${esc(l)}</div><div class="comp-view-meta-val">${esc(v)}</div></div>`).join('')}</div>` : '';
+    const hasPrev = detailNavIndex > 0;
+    const hasNext = detailNavIndex >= 0 && detailNavIndex < detailNavList.length - 1;
+    const prevId = hasPrev ? detailNavList[detailNavIndex - 1] : null;
+    const nextId = hasNext ? detailNavList[detailNavIndex + 1] : null;
+    const navHtml = detailNavList.length > 1 ? `
+      <button class="comp-nav-arrow${hasPrev?'':' disabled'}" onclick="${hasPrev?`compNavTo(${prevId})`:''}" ${hasPrev?'':'disabled'} title="Предыдущая запись (←)">${ICO.back}</button>
+      <button class="comp-nav-arrow${hasNext?'':' disabled'}" onclick="${hasNext?`compNavTo(${nextId})`:''}" ${hasNext?'':'disabled'} title="Следующая запись (→)" style="transform:scaleX(-1)">${ICO.back}</button>
+    ` : '';
     el.innerHTML = `<div class="comp-detail">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
         ${refBackBtnHtml()}
+        ${navHtml}
         <button class="comp-edit-btn" style="margin-left:auto" onclick="compDetailEdit=true;renderCompDetail(${id})">✎ Редактировать</button>
       </div>
       <div class="comp-detail-head">
