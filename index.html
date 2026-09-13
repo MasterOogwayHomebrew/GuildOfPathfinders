@@ -68,6 +68,7 @@ CHANGELOG (новое сверху):
   10) Изучение next.dnd.su / TTG-Club (новая редакция) на предмет UI-идей — Adam попросил "посети сайты и подсмотри что-то полезное". Не выполнено в этом заходе — вернуться отдельным шагом (не блокирует остальные пункты).
   ПОПУТНО: перевод предметов/оружия/брони с next.dnd.su/equipment (было "ОТКРЫТО" в заходе 19) — ЗАВЕРШЁН в персистентной памяти Claude (не в этом файле, см. areas/class-builder-architecture.md / topics/dnd-glossary.md) отдельным шагом того же дня, до начала этого захода правок сайта.
   ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, новый qa_r19.js + полный регресс qa_backbtn.js/qa_sections.js/qa_mobgap.js): отсутствие рамок у ability-card, золотой цвет названия, объединённый заголовок уровня без бейджа, отсутствие add-ab-btn, ПКМ по строке таблицы → модалка → умение создаётся с введённым названием на нужном уровне с форс-открытием группы, ПКМ по плашке в таблице → удаление умения, реалтайм-ре-рендер списка при смене уровня умения подкласса, панель стиля разделителя открывается и вставляет `<hr class="rt-div rt-div-fading">`, пустая иконка категории возвращает `""` без "?", звёзды у заголовка (2 шт в `.home-title`, 2 шт в `.action-bar-title`), кнопка "Главная" в drawer'е — та же рамка что у "Назад" с SVG-иконкой — везде 0 ошибок в консоли (кроме ожидаемых `ERR_TUNNEL_CONNECTION_FAILED` от Google Fonts CDN в изолированной тестовой среде без сети — не баг приложения).
+2026-09-13 (23) — КОНТЕКСТНОЕ МЕНЮ: ГРУППИРОВКА В ПОДМЕНЮ + ВНЕШНИЕ ССЫЛКИ. Меню из ~20 пунктов в один столбец реструктурировано в 3-4 группы с подменю, открывающимися вбок: "Текст ▶" (жирный/курсив/подч./зачёрк./код/выделение + цвет текста), "Структура ▶" (H1-H3/цитата/списки), "Вставка ▶" (разделитель+стиль, таблицы, ссылка на запись, внешняя ссылка), "Таблица ▶" (только внутри таблицы). Подменю — CSS hover (`.ctx-item-has-sub:hover>.ctx-submenu`), `::after` bridge предотвращает "провал" при переходе мыши в подменю, автофлип влево если меню у правого края экрана. Новый пункт "Внешняя ссылка" — `insertExternalLink()`: prompt для URL + текст, вставляет `<a href target=_blank rel=noopener>`. Убрать форматирование — остался прямым пунктом верхнего уровня для быстрого доступа.
 2026-09-13 (22) — КАСТОМНАЯ КАРТИНКА ЭМБЛЕМЫ ГЛАВНОЙ СТРАНИЦЫ. Кнопка-компас в шапке главной (`#home-emblem`) теперь поддерживает замену на свою картинку. Owner видит подсказку "двойной клик — сменить" при наведении; prompt принимает путь или URL (пустая строка — вернуть компас). Значение хранится в `homeEmblemImg` + `cfg.homeEmblemImg` в Firestore (doc=config). `renderHomeEmblem()` — отдельная функция, вызывается из `_boot()` после загрузки конфига. Клиенты видят изменение без перезагрузки (Firestore → loadConfig → renderHomeEmblem). CSS добавлен: `.home-emblem img` (object-fit:contain) + `.home-emblem-edit` (fade-in подсказка при hover).
 2026-09-13 (21) — ФИКС ОТОБРАЖЕНИЯ ЗАПИСЕЙ В БИБЛИОТЕКЕ.
   БАГ: записи созданные в библиотеке без категорий получали `catId='origin'` (фолбэк на первую дефолтную категорию из 'styles'). Такие записи не отображались в кастомной библиотеке, т.к. `catIds.has('origin')` → false, а 'origin' существует глобально → прежний фикс (`!COMP.categories.some(...)`) его не ловил.
@@ -507,6 +508,15 @@ table.ltable tr.tag-drag-over td{background:rgba(158,124,50,0.1)!important;outli
 .ctx-item.danger:hover{background:rgba(180,60,60,0.12);color:#c06060;}
 .ctx-sep{height:1px;background:var(--border);margin:3px 0;}
 .ctx-icon{width:20px;text-align:center;opacity:0.7;font-size:0.85em;}
+/* Flyout submenus */
+.ctx-item-has-sub{position:relative;}
+.ctx-sub-arrow{margin-left:auto;padding-left:10px;font-size:0.72em;opacity:0.45;}
+.ctx-submenu{display:none;position:absolute;left:100%;top:-4px;min-width:178px;background:var(--panel2);border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,0.75);z-index:601;padding:4px 0;}
+.ctx-submenu.flip-left{left:auto;right:100%;}
+.ctx-item-has-sub:hover{background:rgba(158,124,50,0.1);color:var(--gold);}
+.ctx-item-has-sub:hover>.ctx-submenu{display:block;}
+/* Bridge: keeps submenu open while mouse crosses the 1px gap */
+.ctx-item-has-sub::after{content:'';position:absolute;right:-6px;top:0;width:6px;height:100%;}
 
 .scale-ctrl{display:flex;align-items:center;gap:4px;}
 .scale-val{font-size:0.77em;color:var(--muted);min-width:34px;text-align:center;}
@@ -2818,29 +2828,38 @@ document.addEventListener('selectionchange',()=>{
 let ctxCeEl=null;
 function showCtxMenu(e,el){
   ctxCeEl=el;
-  // Save current selection so foreColor can restore it after color picker
   const sel=window.getSelection();
   savedForeRange=(sel&&sel.rangeCount)?sel.getRangeAt(0).cloneRange():null;
   const menu=document.getElementById('ctx-menu');
   const insideTable=e.target.closest('table.ce-table');
-  let html='';
-  // Text format group
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('bold')"><span class="ctx-icon">𝐁</span>Жирный</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('italic')"><span class="ctx-icon">𝐼</span>Курсив</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('underline')"><span class="ctx-icon"><u>U</u></span>Подчёркнутый</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('strikeThrough')"><span class="ctx-icon"><s>S</s></span>Зачёркнутый</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('code')"><span class="ctx-icon">⌨</span>Код</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('mark')"><span class="ctx-icon">🖍</span>Выделение</div>`;
-  html+=`<div class="ctx-sep"></div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(1)"><span class="ctx-icon">H1</span>Заголовок 1</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(2)"><span class="ctx-icon">H2</span>Заголовок 2</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(3)"><span class="ctx-icon">H3</span>Заголовок 3</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleBlockquote()"><span class="ctx-icon">❝</span>Цитата</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertUnorderedList')"><span class="ctx-icon">≡</span>Список</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertOrderedList')"><span class="ctx-icon">①</span>Нумер. список</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();insertCeHr()"><span class="ctx-icon">—</span>Разделитель</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxDividerPanel()"><span class="ctx-icon">◈</span>Стиль разделителя ▸</div>`;
-  html+=`<div id="ctx-divider-panel" style="display:none">
+  const fgColors=['#e0d8c0','#ffffff','#c0c0c0','#808080','#c04040','#c07040','#c0b840','#60a060','#4a90c0','#9060b8','#b8982a','#d4b84a','#4a6080','#6a4a8a','#c06090','#40a0a0','#e88040','#60d060','#8090ff','#ff90b0'];
+
+  // ── Текст (форматирование символов)
+  let txtSub='';
+  txtSub+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('bold')"><span class="ctx-icon">𝐁</span>Жирный</div>`;
+  txtSub+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('italic')"><span class="ctx-icon">𝐼</span>Курсив</div>`;
+  txtSub+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('underline')"><span class="ctx-icon"><u>U</u></span>Подчёркнутый</div>`;
+  txtSub+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('strikeThrough')"><span class="ctx-icon"><s>S</s></span>Зачёркнутый</div>`;
+  txtSub+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('code')"><span class="ctx-icon">⌨</span>Код</div>`;
+  txtSub+=`<div class="ctx-item" onmousedown="event.preventDefault();wrapSelectionTag('mark')"><span class="ctx-icon">🖍</span>Выделение</div>`;
+  txtSub+=`<div class="ctx-sep"></div>`;
+  txtSub+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxColorGrid()"><span class="ctx-icon">${ICO.palette}</span>Цвет текста ▸</div>`;
+  txtSub+=`<div id="ctx-color-panel" style="display:none"><div class="ctx-color-grid">${fgColors.map(c=>`<div class="ctx-color-dot" style="background:${c}" title="${c}" onmousedown="event.preventDefault();applyForeColor('${c}')"></div>`).join('')}</div><label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">+</span> Свой цвет...<input type="color" class="color-input-overlay" value="#ffffff" onchange="applyForeColorFromInput(this)"></label></div>`;
+
+  // ── Структура (блочные элементы)
+  let strSub='';
+  strSub+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(1)"><span class="ctx-icon">H1</span>Заголовок 1</div>`;
+  strSub+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(2)"><span class="ctx-icon">H2</span>Заголовок 2</div>`;
+  strSub+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleHeading(3)"><span class="ctx-icon">H3</span>Заголовок 3</div>`;
+  strSub+=`<div class="ctx-item" onmousedown="event.preventDefault();toggleBlockquote()"><span class="ctx-icon">❝</span>Цитата</div>`;
+  strSub+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertUnorderedList')"><span class="ctx-icon">≡</span>Список</div>`;
+  strSub+=`<div class="ctx-item" onmousedown="event.preventDefault();execFmt('insertOrderedList')"><span class="ctx-icon">①</span>Нумер. список</div>`;
+
+  // ── Вставка (объекты)
+  let insSub='';
+  insSub+=`<div class="ctx-item" onmousedown="event.preventDefault();insertCeHr()"><span class="ctx-icon">—</span>Разделитель</div>`;
+  insSub+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxDividerPanel()"><span class="ctx-icon">◈</span>Стиль разделителя ▸</div>`;
+  insSub+=`<div id="ctx-divider-panel" style="display:none">
     <div class="ctx-div-opts">
       <div class="ctx-div-opt" onmousedown="event.preventDefault();insertCeHr('thin')" title="Тонкий">▬</div>
       <div class="ctx-div-opt" style="font-weight:900" onmousedown="event.preventDefault();insertCeHr('bold')" title="Жирный">▬</div>
@@ -2848,29 +2867,36 @@ function showCtxMenu(e,el){
     </div>
     <label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">${ICO.palette}</span> Цвет разделителя...<input type="color" class="color-input-overlay" value="${lastDividerColor||'#9e7c32'}" onchange="applyDividerColorFromInput(this)"></label>
   </div>`;
-  html+=`<div class="ctx-sep"></div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertTable()"><span class="ctx-icon">▦</span>Вставить таблицу</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertDiceTable()"><span class="ctx-icon">🎲</span>Таблица бросков</div>`;
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxRefPanel()"><span class="ctx-icon">🔗</span>Ссылка на запись ▸</div>`;
-  html+=`<div id="ctx-ref-panel" style="display:none">
+  insSub+=`<div class="ctx-sep"></div>`;
+  insSub+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertTable()"><span class="ctx-icon">▦</span>Вставить таблицу</div>`;
+  insSub+=`<div class="ctx-item" onmousedown="event.preventDefault();promptInsertDiceTable()"><span class="ctx-icon">🎲</span>Таблица бросков</div>`;
+  insSub+=`<div class="ctx-sep"></div>`;
+  insSub+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxRefPanel()"><span class="ctx-icon">🔗</span>Ссылка на запись ▸</div>`;
+  insSub+=`<div id="ctx-ref-panel" style="display:none">
     <input type="text" class="ctx-ref-search" id="ctx-ref-search-inp" placeholder="Поиск записи..." oninput="ctxRefSearch(this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
     <div class="ctx-ref-results" id="ctx-ref-results"></div>
   </div>`;
+  insSub+=`<div class="ctx-item" onmousedown="event.preventDefault();insertExternalLink()"><span class="ctx-icon">🌐</span>Внешняя ссылка</div>`;
+
+  let html='';
+  html+=`<div class="ctx-item ctx-item-has-sub"><span class="ctx-icon">𝐁</span>Текст<span class="ctx-sub-arrow">▶</span><div class="ctx-submenu">${txtSub}</div></div>`;
+  html+=`<div class="ctx-item ctx-item-has-sub"><span class="ctx-icon">¶</span>Структура<span class="ctx-sub-arrow">▶</span><div class="ctx-submenu">${strSub}</div></div>`;
+  html+=`<div class="ctx-item ctx-item-has-sub"><span class="ctx-icon">+</span>Вставка<span class="ctx-sub-arrow">▶</span><div class="ctx-submenu">${insSub}</div></div>`;
+
   if(insideTable){
-    html+=`<div class="ctx-sep"></div>`;
-    html+=`<div class="ctx-item" onmousedown="event.preventDefault();ceTableAddRow(event)"><span class="ctx-icon">+</span>Добавить строку</div>`;
-    html+=`<div class="ctx-item" onmousedown="event.preventDefault();ceTableAddCol(event)"><span class="ctx-icon">+</span>Добавить столбец</div>`;
-    html+=`<div class="ctx-item danger" onmousedown="event.preventDefault();ceTableDelRow(event)"><span class="ctx-icon">−</span>Удалить строку</div>`;
-    html+=`<div class="ctx-item danger" onmousedown="event.preventDefault();ceTableDelCol(event)"><span class="ctx-icon">−</span>Удалить столбец</div>`;
-    html+=`<div class="ctx-item danger" onmousedown="event.preventDefault();ceTableDelete(event)"><span class="ctx-icon">✕</span>Удалить таблицу</div>`;
+    let tblSub='';
+    tblSub+=`<div class="ctx-item" onmousedown="event.preventDefault();ceTableAddRow(event)"><span class="ctx-icon">+</span>Добавить строку</div>`;
+    tblSub+=`<div class="ctx-item" onmousedown="event.preventDefault();ceTableAddCol(event)"><span class="ctx-icon">+</span>Добавить столбец</div>`;
+    tblSub+=`<div class="ctx-sep"></div>`;
+    tblSub+=`<div class="ctx-item danger" onmousedown="event.preventDefault();ceTableDelRow(event)"><span class="ctx-icon">−</span>Удалить строку</div>`;
+    tblSub+=`<div class="ctx-item danger" onmousedown="event.preventDefault();ceTableDelCol(event)"><span class="ctx-icon">−</span>Удалить столбец</div>`;
+    tblSub+=`<div class="ctx-item danger" onmousedown="event.preventDefault();ceTableDelete(event)"><span class="ctx-icon">✕</span>Удалить таблицу</div>`;
+    html+=`<div class="ctx-item ctx-item-has-sub"><span class="ctx-icon">▦</span>Таблица<span class="ctx-sub-arrow">▶</span><div class="ctx-submenu">${tblSub}</div></div>`;
   }
-  html+=`<div class="ctx-sep"></div>`;
-  // Foreground color
-  const fgColors=['#e0d8c0','#ffffff','#c0c0c0','#808080','#c04040','#c07040','#c0b840','#60a060','#4a90c0','#9060b8','#b8982a','#d4b84a','#4a6080','#6a4a8a','#c06090','#40a0a0','#e88040','#60d060','#8090ff','#ff90b0'];
-  html+=`<div class="ctx-item" onmousedown="event.preventDefault();showCtxColorGrid()"><span class="ctx-icon">${ICO.palette}</span>Цвет текста ▸</div>`;
-  html+=`<div id="ctx-color-panel" style="display:none"><div class="ctx-color-grid">${fgColors.map(c=>`<div class="ctx-color-dot" style="background:${c}" title="${c}" onmousedown="event.preventDefault();applyForeColor('${c}')"></div>`).join('')}</div><label class="ctx-color-custom" style="position:relative;overflow:hidden;" onmousedown="event.preventDefault()"><span style="font-size:1.1em">+</span> Свой цвет...<input type="color" class="color-input-overlay" value="#ffffff" onchange="applyForeColorFromInput(this)"></label></div>`;
+
   html+=`<div class="ctx-sep"></div>`;
   html+=`<div class="ctx-item" onmousedown="event.preventDefault();removeAllFormat()"><span class="ctx-icon">✕</span>Убрать форматирование</div>`;
+
   menu.innerHTML=html;
   menu.classList.add('vis');
   let x=e.clientX, y=e.clientY;
@@ -2881,6 +2907,11 @@ function showCtxMenu(e,el){
   if(x+mw>window.innerWidth-4)x=window.innerWidth-mw-4;
   if(y+mh>window.innerHeight-4)y=window.innerHeight-mh-4;
   menu.style.left=x+'px'; menu.style.top=y+'px';
+  // Flip submenus if near right edge
+  const subW=185;
+  if(x+mw+subW>window.innerWidth-8){
+    document.querySelectorAll('#ctx-menu .ctx-submenu').forEach(s=>s.classList.add('flip-left'));
+  }
 }
 function hideCtxMenu(){
   document.getElementById('ctx-menu').classList.remove('vis');
@@ -2905,6 +2936,18 @@ function showCtxDividerPanel(){
 }
 function applyDividerColorFromInput(inp){
   lastDividerColor=inp.value;
+}
+function insertExternalLink(){
+  const target=ctxCeEl;
+  hideCtxMenu();
+  const url=prompt('URL ссылки:','https://');
+  if(!url||url==='https://')return;
+  const sel=window.getSelection();
+  const selText=sel&&sel.rangeCount?sel.getRangeAt(0).toString().trim():'';
+  const label=prompt('Текст ссылки:',selText||url);
+  if(label===null)return;
+  if(target)target.focus();
+  document.execCommand('insertHTML',false,`<a href="${esc(url)}" target="_blank" rel="noopener">${esc(label.trim()||url)}</a>`);
 }
 
 /* Заход 21: ссылки на записи компендиума внутри текста умения/записи (переход или попап) */
