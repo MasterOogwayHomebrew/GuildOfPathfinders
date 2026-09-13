@@ -3460,7 +3460,8 @@ function compFilterEntries() {
   if (currentSourceId) list = list.filter(e => (e.sourceId||'laserllama') === currentSourceId);
   if (openLibId) {
     const catIds = new Set(compCatsInSection().map(c => c.id));
-    list = list.filter(e => catIds.has(e.catId));
+    // Включаем записи этой библиотеки + "осиротевшие" (без catId или catId не существует ни в одной категории)
+    list = list.filter(e => catIds.has(e.catId) || !e.catId || !COMP.categories.some(c => c.id === e.catId));
   }
   const q = compSearch.trim().toLowerCase();
   if (q) list = list.filter(e => (e.name||'').toLowerCase().includes(q) || (e.nameEn||'').toLowerCase().includes(q) || (e.body||'').replace(/<[^>]+>/g,'').toLowerCase().includes(q));
@@ -3515,6 +3516,17 @@ function renderCompByType(el, entries) {
       <div class="comp-group-label" style="color:${cat.color};border-bottom-color:${cat.color}"><span class="cgl-icon">${compCatIconHtml(cat, 1.1)}</span>${esc(cat.name)}</div>
       <div class="comp-group-entries" id="cgrp-${esc(cat.id)}">${colsHtml}</div>
       ${zoneHtml}
+    </div>`;
+  }
+  // Записи без категории или с несуществующей категорией — отдельная группа внизу
+  const knownCatIds = new Set(cats.map(c => c.id));
+  const orphaned = entries.filter(e => !e.catId || !knownCatIds.has(e.catId))
+                          .sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
+  if (orphaned.length) {
+    const colsHtml = compSplitColumns(orphaned.map(e => compEntryHtml(e, compGetCat(e.catId))));
+    html += `<div class="comp-group">
+      <div class="comp-group-label" style="color:var(--muted);border-bottom-color:var(--muted)">Без категории</div>
+      <div class="comp-group-entries">${colsHtml}</div>
     </div>`;
   }
   el.innerHTML = html || `<div style="padding:40px;text-align:center;color:var(--muted)">Ничего не найдено</div>`;
