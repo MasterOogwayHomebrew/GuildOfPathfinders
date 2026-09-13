@@ -68,6 +68,7 @@ CHANGELOG (новое сверху):
   10) Изучение next.dnd.su / TTG-Club (новая редакция) на предмет UI-идей — Adam попросил "посети сайты и подсмотри что-то полезное". Не выполнено в этом заходе — вернуться отдельным шагом (не блокирует остальные пункты).
   ПОПУТНО: перевод предметов/оружия/брони с next.dnd.su/equipment (было "ОТКРЫТО" в заходе 19) — ЗАВЕРШЁН в персистентной памяти Claude (не в этом файле, см. areas/class-builder-architecture.md / topics/dnd-glossary.md) отдельным шагом того же дня, до начала этого захода правок сайта.
   ПРОВЕРЕНО ЛОКАЛЬНО (Playwright, новый qa_r19.js + полный регресс qa_backbtn.js/qa_sections.js/qa_mobgap.js): отсутствие рамок у ability-card, золотой цвет названия, объединённый заголовок уровня без бейджа, отсутствие add-ab-btn, ПКМ по строке таблицы → модалка → умение создаётся с введённым названием на нужном уровне с форс-открытием группы, ПКМ по плашке в таблице → удаление умения, реалтайм-ре-рендер списка при смене уровня умения подкласса, панель стиля разделителя открывается и вставляет `<hr class="rt-div rt-div-fading">`, пустая иконка категории возвращает `""` без "?", звёзды у заголовка (2 шт в `.home-title`, 2 шт в `.action-bar-title`), кнопка "Главная" в drawer'е — та же рамка что у "Назад" с SVG-иконкой — везде 0 ошибок в консоли (кроме ожидаемых `ERR_TUNNEL_CONNECTION_FAILED` от Google Fonts CDN в изолированной тестовой среде без сети — не баг приложения).
+2026-09-13 (22) — КАСТОМНАЯ КАРТИНКА ЭМБЛЕМЫ ГЛАВНОЙ СТРАНИЦЫ. Кнопка-компас в шапке главной (`#home-emblem`) теперь поддерживает замену на свою картинку. Owner видит подсказку "двойной клик — сменить" при наведении; prompt принимает путь или URL (пустая строка — вернуть компас). Значение хранится в `homeEmblemImg` + `cfg.homeEmblemImg` в Firestore (doc=config). `renderHomeEmblem()` — отдельная функция, вызывается из `_boot()` после загрузки конфига. Клиенты видят изменение без перезагрузки (Firestore → loadConfig → renderHomeEmblem). CSS добавлен: `.home-emblem img` (object-fit:contain) + `.home-emblem-edit` (fade-in подсказка при hover).
 2026-09-13 (21) — ФИКС ОТОБРАЖЕНИЯ ЗАПИСЕЙ В БИБЛИОТЕКЕ.
   БАГ: записи созданные в библиотеке без категорий получали `catId='origin'` (фолбэк на первую дефолтную категорию из 'styles'). Такие записи не отображались в кастомной библиотеке, т.к. `catIds.has('origin')` → false, а 'origin' существует глобально → прежний фикс (`!COMP.categories.some(...)`) его не ловил.
   РЕШЕНИЕ: `COMP.entries` получили поле `libId` (какая библиотека "родная" для записи). Фолбэк в `compAddEntry` изменён с `'origin'` на `null` — запись без категорий теперь создаётся с `catId:null, libId:openLibId`. Фильтр в `compFilterEntries` заменён на `catIds.has(e.catId) || e.libId === openLibId` — запись показывается если её catId в текущей библиотеке ИЛИ её libId совпадает с текущей библиотекой. Миграция `healCompEntryLibIds()` выставляет `libId` для старых записей (inferred из catId → категория → libId, фолбэк 'styles'). renderCompByType уже показывает записи с `catId:null` в группе "Без категории" (добавлено в заходе 20).
@@ -811,8 +812,11 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 #home-view{width:100%;min-height:100vh;overflow-y:auto;background:var(--bg);display:flex;flex-direction:column;}
 .home-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:64px 24px 44px;position:relative;overflow:hidden;}
 .home-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 0%,rgba(78,122,92,0.12),transparent 70%);pointer-events:none;}
-.home-emblem{width:64px;height:64px;opacity:0.9;margin-bottom:14px;}
+.home-emblem{width:64px;height:64px;opacity:0.9;margin-bottom:14px;cursor:default;position:relative;}
 .home-emblem svg{width:100%;height:100%;}
+.home-emblem img{width:100%;height:100%;object-fit:contain;display:block;}
+.home-emblem-edit{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:0.62rem;font-family:var(--font);color:var(--muted);white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;}
+.home-emblem:hover .home-emblem-edit{opacity:1;pointer-events:auto;}
 .home-title{font-family:var(--font-display);font-size:2.1em;font-weight:700;color:var(--gold2);letter-spacing:0.02em;line-height:1.15;text-wrap:balance;margin-bottom:8px;}
 .title-star{color:var(--gold);margin:0 12px;font-style:normal;}
 .action-bar-title .title-star{margin:0 8px;}
@@ -932,7 +936,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
      главную, а не пустоту. app-view наоборот скрыт по умолчанию, показывается только через JS. -->
 <div id="home-view">
   <div class="home-hero">
-    <div class="home-emblem"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--gold)" stroke-opacity=".4" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--gold)" stroke-opacity=".2" stroke-width="1"/><circle cx="32" cy="32" r="12" stroke="var(--gold)" stroke-opacity=".15" stroke-width=".8"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--gold)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--gold)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--gold)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--gold)" fill-opacity=".5"/><path d="M50 14L40 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 50L24 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 14L24 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M50 50L40 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><circle cx="32" cy="32" r="5" fill="var(--accent)" fill-opacity=".6"/><circle cx="32" cy="32" r="2.5" fill="var(--gold2)" fill-opacity=".9"/></svg></div>
+    <div class="home-emblem" id="home-emblem"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--gold)" stroke-opacity=".4" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--gold)" stroke-opacity=".2" stroke-width="1"/><circle cx="32" cy="32" r="12" stroke="var(--gold)" stroke-opacity=".15" stroke-width=".8"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--gold)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--gold)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--gold)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--gold)" fill-opacity=".5"/><path d="M50 14L40 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 50L24 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 14L24 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M50 50L40 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><circle cx="32" cy="32" r="5" fill="var(--accent)" fill-opacity=".6"/><circle cx="32" cy="32" r="2.5" fill="var(--gold2)" fill-opacity=".9"/></svg></div>
     <h1 class="home-title"><span class="title-star">✦</span>Гильдия Путеискателей<span class="title-star">✦</span></h1>
     <p class="home-subtitle">Переводы хомбрю-материалов для Dungeons &amp; Dragons 5e</p>
     <div class="home-badge">Неофициальные переводы</div>
@@ -1391,6 +1395,7 @@ const THEME_PRESETS=[
 /* CUSTOM THEMES */
 const CUSTOM_THEMES_KEY='guild-custom-themes-v1';
 let customThemes=[];
+let homeEmblemImg = ''; // путь/URL картинки-эмблемы главной страницы (cfg.homeEmblemImg)
 function loadCustomThemes(){ /* данные загружены через loadConfig() */ }
 function saveCustomThemes(){
   if (!isOwner) return;
@@ -1652,6 +1657,7 @@ async function loadConfig() {
       const cfg = doc.data();
       if (cfg.customThemes) customThemes = cfg.customThemes;
       if (cfg.themeVars) { themeVars = cfg.themeVars; applyTheme(); }
+      if (cfg.homeEmblemImg !== undefined) homeEmblemImg = cfg.homeEmblemImg;
     }
   } catch(e) { console.warn('Firestore loadConfig failed:', e); }
 }
@@ -1660,7 +1666,8 @@ function _saveConfig() {
   if (!isOwner) return;
   db.collection('data').doc('config').set({
     customThemes: customThemes,
-    themeVars: themeVars
+    themeVars: themeVars,
+    homeEmblemImg: homeEmblemImg
   }).catch(e => console.error('_saveConfig failed:', e));
 }
 
@@ -3995,6 +4002,27 @@ function renderLibraryBtn(s, lib){
   const delBtn = isOwner ? `<span class="hsb-del" onclick="event.stopPropagation();deleteSourceLibrary('${esc(s.id)}','${esc(lib.id)}')" title="Удалить библиотеку">✕</span>` : '';
   return `<div class="home-section-btn" onclick="event.stopPropagation();location.hash='src/${esc(s.id)}/${esc(lib.id)}'">${esc(lib.name)}${cnt!=null?` <span class="home-section-count">(${cnt})</span>`:''}${delBtn}</div>`;
 }
+function renderHomeEmblem() {
+  const el = document.getElementById('home-emblem');
+  if (!el) return;
+  const inner = homeEmblemImg
+    ? `<img src="${esc(homeEmblemImg)}" alt="эмблема">`
+    : `<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="29" stroke="var(--gold)" stroke-opacity=".4" stroke-width="1.5"/><circle cx="32" cy="32" r="20" stroke="var(--gold)" stroke-opacity=".2" stroke-width="1"/><circle cx="32" cy="32" r="12" stroke="var(--gold)" stroke-opacity=".15" stroke-width=".8"/><path d="M32 6L35 22L32 18L29 22Z" fill="var(--gold)" fill-opacity=".9"/><path d="M32 58L29 42L32 46L35 42Z" fill="var(--gold)" fill-opacity=".5"/><path d="M58 32L42 29L46 32L42 35Z" fill="var(--gold)" fill-opacity=".5"/><path d="M6 32L22 35L18 32L22 29Z" fill="var(--gold)" fill-opacity=".5"/><path d="M50 14L40 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 50L24 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M14 14L24 28" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><path d="M50 50L40 36" stroke="var(--gold)" stroke-opacity=".25" stroke-width=".8"/><circle cx="32" cy="32" r="5" fill="var(--accent)" fill-opacity=".6"/><circle cx="32" cy="32" r="2.5" fill="var(--gold2)" fill-opacity=".9"/></svg>`;
+  const editHint = isOwner ? `<span class="home-emblem-edit">двойной клик — сменить</span>` : '';
+  el.innerHTML = inner + editHint;
+  el.ondblclick = isOwner ? editHomeEmblem : null;
+  el.style.cursor = isOwner ? 'pointer' : 'default';
+}
+
+function editHomeEmblem() {
+  const cur = homeEmblemImg || '';
+  const val = prompt('Путь или URL картинки-эмблемы\n(оставь пустым — вернуть компас):', cur);
+  if (val === null) return; // отмена
+  homeEmblemImg = val.trim();
+  _saveConfig();
+  renderHomeEmblem();
+}
+
 function renderHome(){
   const grid=document.getElementById('home-sources-grid');
   if(!grid || !sources.length) return; // данные ещё не загрузились — статичный фолбэк из HTML остаётся как есть
@@ -4224,6 +4252,7 @@ async function _boot() {
   renderSidebar();
   renderMain();
   renderHome();
+  renderHomeEmblem();
   renderHomeLinks();
   syncLegalFooters();
   if (!isOwner) applyROMode();
